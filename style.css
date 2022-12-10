@@ -80,4 +80,63 @@ a {
 .art {
     background: #ffffff;
     color: #1f1f1f;
+    padding-top: 3rem;
+    padding-bottom: 3rem;
+}
+
+
+
+
+
+.wprowadzenie {
+    background: rgb(228, 66, 2);
+    border-radius: 25px;
+    color: #f7f7f7;
+    padding: 2rem;
+    display: flex;
+    justify-content: space-between;
+    flex-flow: row wrap;
+}
+
+.hero {
+    font-size: 2em;
+    line-height: normal;
+    font-weight: 700;
+    padding-bottom: 1.5rem;
+
+    width: 610px;
+}
+
+.mojezdjecie {
+    /* position: relative;
+    margin-right: 4px;
+    border-radius: 25px; */
+
+    align-self: start;
+    background: #fff;
+    border: .5em solid #fff;
+    border-radius: .5em;
+    -webkit-box-shadow: 0 .5em 1em rgba(0,0,0,.15);
+    box-shadow: 0 .5em 1em rgba(0,0,0,.15);
+    grid-area: image;
+    overflow: hidden;
+
+    height: 400px;
+    width: 320px;
+    object-fit: cover;
+
+}
+
+
+
+@media screen and (min-width: 769px) {
+    
+    .hero {
+
+        font-size: 3rem;
+
+    }
+
+
+
 }
