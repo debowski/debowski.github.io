@@ -32,7 +32,6 @@ header::after {
     display: block;
   }
 
-<<<<<<< HEAD
 .logo {
     float: left;
     font-size: 1rem;
@@ -74,16 +73,6 @@ header::after {
   
 .hamburger::after {
 transform: translateY(3px);
-=======
-
-.container {
-    width: 95%;
-    max-width: 1000px;
-    margin: 0 auto;
-    margin: 0 auto;
-    max-width: 62.5rem;
-    padding: 0 1rem;
->>>>>>> parent of b3a32c0 (update02)
 }
 
 
@@ -178,6 +167,10 @@ a {
     background: #ffffff;
     color: #1f1f1f;
 <<<<<<< HEAD
+<<<<<<< HEAD
+}
+>>>>>>> parent of b3a32c0 (update02)
+=======
 }
 >>>>>>> parent of b3a32c0 (update02)
 =======
