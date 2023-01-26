@@ -32,6 +32,7 @@ header::after {
     display: block;
   }
 
+<<<<<<< HEAD
 .logo {
     float: left;
     font-size: 1rem;
@@ -73,10 +74,21 @@ header::after {
   
 .hamburger::after {
 transform: translateY(3px);
+=======
+
+.container {
+    width: 95%;
+    max-width: 1000px;
+    margin: 0 auto;
+    margin: 0 auto;
+    max-width: 62.5rem;
+    padding: 0 1rem;
+>>>>>>> parent of b3a32c0 (update02)
 }
 
 
 
+<<<<<<< HEAD
 /*==========================*/
 
 .primary-navigation {
@@ -140,3 +152,30 @@ transform: translateY(3px);
     text-align: right;
     color: rgba(255, 255, 255, 0.4);
   }
+=======
+.main-nav{
+    font-size: 1.4rem;
+}
+
+.main-nav > ul {
+    list-style: none;
+    display: flex;
+    justify-content: space-evenly;
+    flex-flow: row wrap;
+}
+
+.main-nav > ul > li {
+    margin-left: 0rem;
+    margin-right: 1rem;
+}
+
+a {
+    text-decoration: none;
+    color: black;
+}
+
+.art {
+    background: #ffffff;
+    color: #1f1f1f;
+}
+>>>>>>> parent of b3a32c0 (update02)
