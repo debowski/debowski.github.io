@@ -5,7 +5,28 @@ body {
   box-sizing: border-box;
 }
 
-
-li {
-  display: ;
+header {
+  background: #1f1d1d;
+  color: #fff;
+  padding: 20px 0;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
+
+
+h1, h2, p {
+  margin: 0;
+  padding: 0;
+}
+
+
+main {
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+
