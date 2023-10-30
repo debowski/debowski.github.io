@@ -1,5 +1,5 @@
-const pass = document.getElementById('password');
-const btn = document.getElementById('checkpassword');
+const pass = document.querySelector('#password');
+const btn = document.querySelector('#checkpassword');
 
 
     // /^            : Start
