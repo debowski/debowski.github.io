@@ -4,6 +4,8 @@ const dodawanie = document.querySelector('#dodawanie');
 const odejmowanie = document.querySelector('#odejmowanie');
 const mnozenie = document.querySelector('#mnozenie');
 const dzielenie = document.querySelector('#dzielenie');
+
+/** @type {HTMLButtonElement} */
 const result = document.querySelector('#result');
 
   dodawanie.addEventListener('click', () => {
@@ -57,3 +59,4 @@ const result = document.querySelector('#result');
       result.innerHTML = l1.value +" - "+l2.value+" = "+wynik;}
   });
 
+result.addEventListener('mouseover', )
