@@ -5,6 +5,10 @@ body {
   box-sizing: border-box;
 }
 
+
+h1,h2,h3{line-height:1.2}
+
+
 header {
   background: #1f1d1d;
   color: #fff;
@@ -23,7 +27,12 @@ h1, h2, p {
 
 
 main {
-  padding: 20px;
+  margin:40px auto;
+  max-width:650px;
+  line-height:1.6;
+  font-size:18px;
+  color:#444;
+  padding:0 10px;
   display: flex;
   justify-content: center;
   align-items: center;
