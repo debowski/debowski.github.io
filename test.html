@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    
+    <input type="checkbox" name="option" value="A"> Opcja A<br>
+    <input type="checkbox" name="option" value="B"> Opcja B<br>
+    <input type="checkbox" name="option" value="C"> Opcja C<br>
+    <button onclick="sprawdzZaznaczone()">Pokaż zaznaczone</button>
+    
+    <script>
+    function sprawdzZaznaczone() {
+        let checkedValues = [];
+        document.querySelectorAll('input[name="option"]:checked').forEach(function(element) {
+            checkedValues.push(element.value);
+        });
+        alert("Zaznaczone: " + checkedValues.join(", "));
+    }
+    </script>
+
+
+
+</body>
+</html>
