@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Odliczanie Szkolne - 8:00 AM</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            margin-bottom: 40px;
+            font-size: 1.8rem;
+            text-align: center;
+        }
+
+        .countdown-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 25px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .event-card {
+            background-color: #222;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .event-title {
+            font-size: 1.3rem;
+            color: #bbb;
+            margin-bottom: 10px;
+            font-weight: 400;
+        }
+
+        .timer {
+            font-size: 3.2rem;
+            font-weight: 800;
+            color: #00ffcc;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .timer span {
+            font-size: 0.9rem;
+            color: #777;
+            text-transform: uppercase;
+            margin-left: 4px;
+            margin-right: 12px;
+        }
+
+        /* Kolorowe paski boczne dla lepszej orientacji */
+        .tech { border-left: 10px solid #ffcc00; }
+        .matura { border-left: 10px solid #ff4444; }
+        .zawodowe { border-left: 10px solid #4444ff; }
+        .koniec { border-left: 10px solid #44ff44; }
+
+        @media (max-width: 900px) {
+            .countdown-grid { grid-template-columns: 1fr; }
+            .timer { font-size: 2.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Wydarzenia Szkolne 2026</h1>
+
+    <div class="countdown-grid">
+        <div class="event-card tech">
+            <div class="event-title">Koniec roku kl. 5 Technikum</div>
+            <div class="timer" id="timer-tech">--d --h --m</div>
+        </div>
+
+        <div class="event-card matura">
+            <div class="event-title">Egzaminy Maturalne</div>
+            <div class="timer" id="timer-matura">--d --h --m</div>
+        </div>
+
+        <div class="event-card zawodowe">
+            <div class="event-title">Egzaminy Zawodowe</div>
+            <div class="timer" id="timer-zawodowe">--d --h --m</div>
+        </div>
+
+        <div class="event-card koniec">
+            <div class="event-title">Koniec Roku Szkolnego</div>
+            <div class="timer" id="timer-koniec">--d --h --m</div>
+        </div>
+    </div>
+
+    <script>
+        // Daty ustawione sztywno na 8:00 rano
+        const events = [
+            { id: 'timer-tech', date: "2026-04-24T08:00:00" },
+            { id: 'timer-matura', date: "2026-05-04T08:00:00" },
+            { id: 'timer-zawodowe', date: "2026-06-01T08:00:00" },
+            { id: 'timer-koniec', date: "2026-06-26T08:00:00" }
+        ];
+
+        function updateCountdowns() {
+            const now = new Date().getTime();
+
+            events.forEach(event => {
+                const targetDate = new Date(event.date).getTime();
+                const distance = targetDate - now;
+                const element = document.getElementById(event.id);
+
+                if (distance < 0) {
+                    element.innerHTML = "TRWA LUB ZAKOŃCZONE";
+                    element.style.fontSize = "1.5rem";
+                    element.style.color = "#555";
+                    return;
+                }
+
+                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+
+                element.innerHTML = `${days}<span>dni</span> ${hours}<span>h</span> ${minutes}<span>m</span>`;
+            });
+        }
+
+        // Aktualizacja co minutę wystarczy dla korytarza
+        setInterval(updateCountdowns, 60000);
+        updateCountdowns();
+    </script>
+</body>
+</html>
