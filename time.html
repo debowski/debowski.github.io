@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zegar Warszawa</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        #location {
+            font-size: 2rem;
+            color: #888;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        #clock {
+            font-size: 12rem;
+            font-weight: 700;
+            line-height: 1;
+            margin: 0;
+        }
+
+        #date {
+            font-size: 2.5rem;
+            color: #aaa;
+            margin-top: 20px;
+        }
+
+        /* Stylizacja dla ekranów pionowych (Digital Signage często tak działa) */
+        @media (orientation: portrait) {
+            #clock { font-size: 20vw; }
+            #date { font-size: 5vw; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="location">Łaziska Górne</div>
+    <div id="clock">00:00:00</div>
+    <div id="date">Dzień, 00 Miesiąca 202X</div>
+
+    <script>
+        function updateTime() {
+            const now = new Date();
+            
+            // Opcje dla czasu w Warszawie
+            const timeOptions = {
+                timeZone: 'Europe/Warsaw',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            };
+
+            // Opcje dla daty
+            const dateOptions = {
+                timeZone: 'Europe/Warsaw',
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            };
+
+            const timeString = new Intl.DateTimeFormat('pl-PL', timeOptions).format(now);
+            const dateString = new Intl.DateTimeFormat('pl-PL', dateOptions).format(now);
+
+            document.getElementById('clock').textContent = timeString;
+            document.getElementById('date').textContent = dateString;
+        }
+
+        // Aktualizacja co sekundę
+        setInterval(updateTime, 1000);
+        updateTime(); // Wywołanie na start
+    </script>
+</body>
+</html>
