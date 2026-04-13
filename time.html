@@ -18,7 +18,7 @@
             overflow-x: hidden;
         }
 
-        /* Główny zegar (Warszawa) */
+        /* Główny zegar (Łaziska Górne) */
         #main-container {
             text-align: center;
             margin-bottom: 30px;
@@ -44,7 +44,7 @@
             color: #aaa;
         }
 
-        /* Panel światowy */
+        /* Panel światowy - kolejność wg stref czasowych */
         #world-clock-container {
             display: flex;
             flex-wrap: wrap;
@@ -99,10 +99,6 @@
 
     <div id="world-clock-container">
         <div class="city-card">
-            <span class="city-name">Sydney</span>
-            <span class="city-time" id="time-la">00:00</span>
-        </div>
-        <div class="city-card">
             <span class="city-name">Nowy Jork</span>
             <span class="city-time" id="time-ny">00:00</span>
         </div>
@@ -114,7 +110,8 @@
             <span class="city-name">Sycylia</span>
             <span class="city-time" id="time-sicily">00:00</span>
         </div>
-        <div class="city-card" > <span class="city-name">Ateny</span>
+        <div class="city-card">
+            <span class="city-name">Ateny</span>
             <span class="city-time" id="time-greece">00:00</span>
         </div>
         <div class="city-card">
@@ -128,6 +125,10 @@
         <div class="city-card">
             <span class="city-name">Tokio</span>
             <span class="city-time" id="time-tokyo">00:00</span>
+        </div>
+        <div class="city-card">
+            <span class="city-name">Sydney</span>
+            <span class="city-time" id="time-sydney">00:00</span>
         </div>
     </div>
 
@@ -147,14 +148,13 @@
                 } catch (e) { return "Błąd"; }
             };
 
-            // Warszawa
+            // Main Clock
             document.getElementById('clock-main').textContent = formatTime('Europe/Warsaw', true);
             document.getElementById('date-main').textContent = new Intl.DateTimeFormat('pl-PL', {
                 weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
             }).format(now);
 
-            // Reszta świata
-            document.getElementById('time-la').textContent = formatTime('Australia/Sydney');
+            // World Clocks (Posortowane czasowo)
             document.getElementById('time-ny').textContent = formatTime('America/New_York');
             document.getElementById('time-london').textContent = formatTime('Europe/London');
             document.getElementById('time-sicily').textContent = formatTime('Europe/Rome');
@@ -162,6 +162,7 @@
             document.getElementById('time-istanbul').textContent = formatTime('Europe/Istanbul');
             document.getElementById('time-beijing').textContent = formatTime('Asia/Shanghai');
             document.getElementById('time-tokyo').textContent = formatTime('Asia/Tokyo');
+            document.getElementById('time-sydney').textContent = formatTime('Australia/Sydney');
         }
 
         setInterval(updateClocks, 1000);
