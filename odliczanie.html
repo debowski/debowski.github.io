@@ -3,112 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Odliczanie Szkolne - 8:00 AM</title>
+    <title>Odliczanie Szkolne - Korytarz</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body {
-            background-color: #1a1a1a;
-            color: #ffffff;
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        :root {
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --text-main: #1a1a1a;
+            /* Kolory kategorii */
+            --color-tech: #f39c12;
+            --color-matura: #e74c3c;
+            --color-zawodowe: #3498db;
+            --color-koniec: #2ecc71;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-gradient);
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
+        }
+
+        #main-container {
+            width: 95vw;
+            height: 90vh;
+            background: var(--card-bg);
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.4);
+            display: flex;
+            flex-direction: column;
+            padding: 40px;
             box-sizing: border-box;
         }
 
-        h1 {
-            color: #888;
-            text-transform: uppercase;
-            letter-spacing: 5px;
-            margin-bottom: 40px;
-            font-size: 1.8rem;
-            text-align: center;
+        /* Nagłówek */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 5px solid #eee;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
         }
 
+        .title {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: #2d3436;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+        }
+
+        .clock {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: #636e72;
+            background: #f1f2f6;
+            padding: 10px 30px;
+            border-radius: 20px;
+        }
+
+        /* Siatka wydarzeń */
         .countdown-grid {
+            flex: 1;
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 25px;
-            max-width: 1200px;
-            width: 100%;
+            grid-template-rows: repeat(2, 1fr);
+            gap: 30px;
         }
 
         .event-card {
-            background-color: #222;
-            border: 1px solid #333;
-            border-radius: 12px;
-            padding: 25px;
-            text-align: center;
+            border-radius: 30px;
+            padding: 30px;
             display: flex;
             flex-direction: column;
             justify-content: center;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(0,0,0,0.05);
+            transition: transform 0.3s ease;
         }
 
-        .event-title {
-            font-size: 1.3rem;
-            color: #bbb;
+        /* Paski boczne kolorowe */
+        .tech { background: #fffaf0; border-left: 25px solid var(--color-tech); }
+        .matura { background: #fff5f5; border-left: 25px solid var(--color-matura); }
+        .zawodowe { background: #f0f7ff; border-left: 25px solid var(--color-zawodowe); }
+        .koniec { background: #f2fff7; border-left: 25px solid var(--color-koniec); }
+
+        .event-label {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #636e72;
+            text-transform: uppercase;
             margin-bottom: 10px;
-            font-weight: 400;
+        }
+
+        .event-name {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: #2d3436;
+            margin-bottom: 20px;
         }
 
         .timer {
-            font-size: 3.2rem;
-            font-weight: 800;
-            color: #00ffcc;
+            font-size: 6.5rem; /* Ogromne cyfry */
+            font-weight: 900;
+            color: #1a1a1a;
             font-variant-numeric: tabular-nums;
+            display: flex;
+            align-items: baseline;
+            gap: 15px;
         }
 
         .timer span {
-            font-size: 0.9rem;
-            color: #777;
-            text-transform: uppercase;
-            margin-left: 4px;
-            margin-right: 12px;
+            font-size: 2.2rem;
+            color: #888;
+            font-weight: 600;
+            text-transform: lowercase;
         }
 
-        /* Kolorowe paski boczne dla lepszej orientacji */
-        .tech { border-left: 10px solid #ffcc00; }
-        .matura { border-left: 10px solid #ff4444; }
-        .zawodowe { border-left: 10px solid #4444ff; }
-        .koniec { border-left: 10px solid #44ff44; }
+        .icon-bg {
+            position: absolute;
+            right: -20px;
+            bottom: -20px;
+            font-size: 12rem;
+            opacity: 0.07;
+            transform: rotate(-15deg);
+        }
 
-        @media (max-width: 900px) {
-            .countdown-grid { grid-template-columns: 1fr; }
-            .timer { font-size: 2.8rem; }
+        /* Komunikat o zakończeniu */
+        .finished {
+            font-size: 4rem;
+            color: #b2bec3;
+            font-weight: 800;
         }
     </style>
 </head>
 <body>
 
-    <h1>Wydarzenia Szkolne 2026</h1>
-
-    <div class="countdown-grid">
-        <div class="event-card tech">
-            <div class="event-title">Koniec roku kl. 5 Technikum</div>
-            <div class="timer" id="timer-tech">--d --h --m</div>
+    <div id="main-container">
+        <div class="header">
+            <div class="title"><i class="fas fa-calendar-day"></i> Wydarzenia Szkolne 2026</div>
+            <div class="clock" id="clock">00:00:00</div>
         </div>
 
-        <div class="event-card matura">
-            <div class="event-title">Egzaminy Maturalne</div>
-            <div class="timer" id="timer-matura">--d --h --m</div>
-        </div>
+        <div class="countdown-grid">
+            <div class="event-card tech">
+                <div class="event-label">Pozostało:</div>
+                <div class="event-name">Koniec roku kl. 5</div>
+                <div class="timer" id="timer-tech">--<span>d</span> --<span>h</span> --<span>m</span></div>
+                <i class="fas fa-graduation-cap icon-bg"></i>
+            </div>
 
-        <div class="event-card zawodowe">
-            <div class="event-title">Egzaminy Zawodowe</div>
-            <div class="timer" id="timer-zawodowe">--d --h --m</div>
-        </div>
+            <div class="event-card matura">
+                <div class="event-label">Do egzaminów:</div>
+                <div class="event-name">Matura 2026</div>
+                <div class="timer" id="timer-matura">--<span>d</span> --<span>h</span> --<span>m</span></div>
+                <i class="fas fa-pen-nib icon-bg"></i>
+            </div>
 
-        <div class="event-card koniec">
-            <div class="event-title">Koniec Roku Szkolnego</div>
-            <div class="timer" id="timer-koniec">--d --h --m</div>
+            <div class="event-card zawodowe">
+                <div class="event-label">Do egzaminów:</div>
+                <div class="event-name">Egzaminy Zawodowe</div>
+                <div class="timer" id="timer-zawodowe">--<span>d</span> --<span>h</span> --<span>m</span></div>
+                <i class="fas fa-tools icon-bg"></i>
+            </div>
+
+            <div class="event-card koniec">
+                <div class="event-label">Do wakacji:</div>
+                <div class="event-name">Koniec Roku Szkolnego</div>
+                <div class="timer" id="timer-koniec">--<span>d</span> --<span>h</span> --<span>m</span></div>
+                <i class="fas fa-sun icon-bg"></i>
+            </div>
         </div>
     </div>
 
     <script>
-        // Daty ustawione sztywno na 8:00 rano
+        // Zegar czasu rzeczywistego
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent = now.toLocaleTimeString('pl-PL');
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Konfiguracja wydarzeń
         const events = [
             { id: 'timer-tech', date: "2026-04-24T08:00:00" },
             { id: 'timer-matura', date: "2026-05-04T08:00:00" },
@@ -125,9 +210,7 @@
                 const element = document.getElementById(event.id);
 
                 if (distance < 0) {
-                    element.innerHTML = "TRWA LUB ZAKOŃCZONE";
-                    element.style.fontSize = "1.5rem";
-                    element.style.color = "#555";
+                    element.innerHTML = '<div class="finished">WYDARZENIE ZAKOŃCZONE</div>';
                     return;
                 }
 
@@ -135,12 +218,16 @@
                 const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                 const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
 
-                element.innerHTML = `${days}<span>dni</span> ${hours}<span>h</span> ${minutes}<span>m</span>`;
+                element.innerHTML = `
+                    ${days}<span>dni</span> 
+                    ${hours}<span>h</span> 
+                    ${minutes}<span>m</span>
+                `;
             });
         }
 
-        // Aktualizacja co minutę wystarczy dla korytarza
-        setInterval(updateCountdowns, 60000);
+        // Aktualizacja co sekundę, żeby odliczanie było "żywe" na korytarzu
+        setInterval(updateCountdowns, 1000);
         updateCountdowns();
     </script>
 </body>
