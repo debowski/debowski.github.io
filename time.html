@@ -3,132 +3,172 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zegar Światowy AbleSign</title>
+    <title>Zegar Światowy - Szkoła</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css">
     <style>
-        body {
-            background-color: #03227d;
-            color: #ffffff;
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        :root {
+            --bg-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --text-main: #1a1a1a;
+            --accent-blue: #0984e3;
+        }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-gradient);
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        #main-container {
+            width: 96vw; height: 92vh; background: var(--card-bg);
+            border-radius: 40px; box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column; padding: 30px; box-sizing: border-box;
+        }
+
+        /* GŁÓWNY ZEGAR */
+        .main-clock-section {
+            flex: 1.8;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            overflow-x: hidden;
+            border-bottom: 5px solid #eee;
+            position: relative;
         }
 
-        /* Główny zegar (Łaziska Górne) */
-        #main-container {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 20px;
+        .main-flag {
+            font-size: 5rem;
+            margin-bottom: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
 
         #location-main {
-            font-size: 4rem;
+            font-size: 3.5rem;
             font-weight: 900;
-            color: #888;
+            color: var(--accent-blue);
             text-transform: uppercase;
-            letter-spacing: 4px;
+            letter-spacing: 8px;
         }
 
         #clock-main {
-            font-size: 10rem;
+            font-size: 16rem;
             font-weight: 800;
-            margin: -5px 0;
+            color: #1a1a1a;
+            line-height: 1;
+            margin: 15px 0;
+            font-variant-numeric: tabular-nums;
         }
 
         #date-main {
-            font-size: 3rem;
-            color: #aaa;
+            font-size: 4rem;
+            font-weight: 600;
+            color: #636e72;
+            text-transform: capitalize;
         }
 
-        /* Panel światowy - kolejność wg stref czasowych */
-        #world-clock-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            padding: 30px;
-            background-color: #008726;
-            width: 100%;
-            justify-content: center;
-            box-sizing: border-box;
-            border-top: 2px solid #333;
+        /* PANEL ŚWIATOWY */
+        #world-clock-grid {
+            flex: 1.2;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 20px;
+            padding-top: 25px;
         }
 
         .city-card {
-            background-color: #eeeeee;
-            color: #333;
-            padding: 12px 20px;
-            text-align: center;
-            min-width: 130px;
-            border-radius: 2px;
-            flex-grow: 0;
+            background: #f8f9fa;
+            border-radius: 25px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid #ddd;
+            position: relative;
+        }
+
+        .flag-icon-mini {
+            font-size: 3rem;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.1);
         }
 
         .city-name {
             font-size: 2rem;
             font-weight: 800;
-            margin: 0;
-            display: block;
-            text-align: center;
-            border-bottom: 1px solid #ccc;
-            margin-bottom: 4px;
+            color: #2d3436;
+            margin-bottom: 2px;
+            text-transform: uppercase;
         }
 
         .city-time {
-            font-size: 3rem;
-            font-weight: 400;
-            margin: 0;
+            font-size: 3.8rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+            font-variant-numeric: tabular-nums;
         }
 
-        @media (max-width: 800px) {
-            #clock-main { font-size: 15vw; }
-            .city-card { min-width: 110px; }
+        /* Specjalne wyróżnienie dla Rzymu/Sycylii zgodnie z poprzednim kodem */
+        .highlight-card {
+            background-color: #e3f2fd !important;
+            border-color: #bbdefb !important;
         }
     </style>
 </head>
 <body>
 
     <div id="main-container">
-        <div id="location-main">Łaziska Górne</div>
-        <div id="clock-main">00:00:00</div>
-        <div id="date-main">Ładowanie...</div>
-    </div>
+        <div class="main-clock-section">
+            <span class="fi fi-pl main-flag"></span>
+            <div id="location-main">Łaziska Górne</div>
+            <div id="clock-main">00:00:00</div>
+            <div id="date-main">Ładowanie...</div>
+        </div>
 
-    <div id="world-clock-container">
-        <div class="city-card">
-            <span class="city-name">Nowy Jork</span>
-            <span class="city-time" id="time-ny">00:00</span>
-        </div>
-        <div class="city-card">
-            <span class="city-name">Londyn</span>
-            <span class="city-time" id="time-london">00:00</span>
-        </div>
-        <div class="city-card" style="background-color: #d4e9fe;">
-            <span class="city-name">Sycylia</span>
-            <span class="city-time" id="time-sicily">00:00</span>
-        </div>
-        <div class="city-card">
-            <span class="city-name">Ateny</span>
-            <span class="city-time" id="time-greece">00:00</span>
-        </div>
-        <div class="city-card">
-            <span class="city-name">Stambuł</span>
-            <span class="city-time" id="time-istanbul">00:00</span>
-        </div>
-        <div class="city-card">
-            <span class="city-name">Pekin</span>
-            <span class="city-time" id="time-beijing">00:00</span>
-        </div>
-        <div class="city-card">
-            <span class="city-name">Tokio</span>
-            <span class="city-time" id="time-tokyo">00:00</span>
-        </div>
-        <div class="city-card">
-            <span class="city-name">Sydney</span>
-            <span class="city-time" id="time-sydney">00:00</span>
+        <div id="world-clock-grid">
+            <div class="city-card">
+                <span class="fi fi-us flag-icon-mini"></span>
+                <span class="city-name">Nowy Jork</span>
+                <span class="city-time" id="time-ny">00:00</span>
+            </div>
+            <div class="city-card">
+                <span class="fi fi-gb flag-icon-mini"></span>
+                <span class="city-name">Londyn</span>
+                <span class="city-time" id="time-london">00:00</span>
+            </div>
+            <div class="city-card highlight-card">
+                <span class="fi fi-it flag-icon-mini"></span>
+                <span class="city-name">Rzym</span>
+                <span class="city-time" id="time-rome">00:00</span>
+            </div>
+            <div class="city-card">
+                <span class="fi fi-gr flag-icon-mini"></span>
+                <span class="city-name">Ateny</span>
+                <span class="city-time" id="time-greece">00:00</span>
+            </div>
+            <div class="city-card">
+                <span class="fi fi-tr flag-icon-mini"></span>
+                <span class="city-name">Stambuł</span>
+                <span class="city-time" id="time-istanbul">00:00</span>
+            </div>
+            <div class="city-card">
+                <span class="fi fi-cn flag-icon-mini"></span>
+                <span class="city-name">Pekin</span>
+                <span class="city-time" id="time-beijing">00:00</span>
+            </div>
+            <div class="city-card">
+                <span class="fi fi-jp flag-icon-mini"></span>
+                <span class="city-name">Tokio</span>
+                <span class="city-time" id="time-tokyo">00:00</span>
+            </div>
+            <div class="city-card">
+                <span class="fi fi-au flag-icon-mini"></span>
+                <span class="city-name">Sydney</span>
+                <span class="city-time" id="time-sydney">00:00</span>
+            </div>
         </div>
     </div>
 
@@ -145,19 +185,17 @@
                         second: showSeconds ? '2-digit' : undefined,
                         hour12: false
                     }).format(now);
-                } catch (e) { return "Błąd"; }
+                } catch (e) { return "--:--"; }
             };
 
-            // Main Clock
             document.getElementById('clock-main').textContent = formatTime('Europe/Warsaw', true);
-            document.getElementById('date-main').textContent = new Intl.DateTimeFormat('pl-PL', {
-                weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-            }).format(now);
+            document.getElementById('date-main').textContent = now.toLocaleDateString('pl-PL', { 
+                weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
+            });
 
-            // World Clocks (Posortowane czasowo)
             document.getElementById('time-ny').textContent = formatTime('America/New_York');
             document.getElementById('time-london').textContent = formatTime('Europe/London');
-            document.getElementById('time-sicily').textContent = formatTime('Europe/Rome');
+            document.getElementById('time-rome').textContent = formatTime('Europe/Rome');
             document.getElementById('time-greece').textContent = formatTime('Europe/Athens');
             document.getElementById('time-istanbul').textContent = formatTime('Europe/Istanbul');
             document.getElementById('time-beijing').textContent = formatTime('Asia/Shanghai');
