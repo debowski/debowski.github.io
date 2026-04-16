@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wirtualna Kronika Szkolna - Flipbook</title>
+    <!-- Biblioteka Strona-Po-Stronie (PageFlip) -->
+    <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #121212;
+            color: #9ca3af;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Kontener dla książki */
+        #canvas-container {
+            width: 100vw;
+            height: calc(100vh - 60px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .flip-book {
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.7);
+            background-size: cover;
+            display: none;
+        }
+
+        .page {
+            background-color: #fcfaf5;
+            overflow: hidden;
+            border: 1px solid #d1d1d1;
+        }
+
+        .page-content {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .page-content img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        /* Dyskretna stylizacja panelu kontrolnego */
+        .controls {
+            height: 60px;
+            background: #181818;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            border-top: 1px solid #262626;
+            transition: opacity 0.3s;
+        }
+
+        .btn-custom {
+            color: #6b7280;
+            padding: 6px 14px;
+            border-radius: 6px;
+            transition: all 0.2s;
+            cursor: pointer;
+            font-size: 0.85rem;
+            border: 1px solid #262626;
+            background: transparent;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-custom:hover {
+            color: #e5e7eb;
+            background: #262626;
+            border-color: #4b5563;
+        }
+
+        .btn-active {
+            color: #4f46e5;
+            border-color: #4f46e5;
+            background: rgba(79, 70, 229, 0.1);
+        }
+
+        /* Stylizacja suwaka */
+        .range-slider {
+            -webkit-appearance: none;
+            width: 80px;
+            height: 4px;
+            background: #262626;
+            border-radius: 2px;
+            outline: none;
+        }
+
+        .range-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            background: #4f46e5;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        /* Subtelny pasek postępu */
+        #progress-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: #1f1f1f;
+            z-index: 50;
+        }
+
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background: #4f46e5;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 8px rgba(79, 70, 229, 0.4);
+        }
+
+        /* Tryb Fullscreen */
+        :fullscreen #canvas-container {
+            height: calc(100vh - 3px);
+            background: #000;
+        }
+        
+        :fullscreen #main-ui {
+            opacity: 0.2;
+        }
+        :fullscreen #main-ui:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Górny panel / Menu -->
+    <div id="main-ui">
+        <div class="controls px-4">
+            <div class="flex items-center gap-2">
+                <label for="file-upload" class="btn-custom">
+                    Wgraj zdjęcia
+                </label>
+                <input type="file" id="file-upload" multiple accept="image/*" class="hidden">
+            </div>
+            
+            <div class="flex items-center gap-2 border-l border-r border-gray-800 px-4">
+                <button id="prev-btn" class="btn-custom">Poprzednia</button>
+                <span id="page-indicator" class="text-xs uppercase tracking-widest px-2 text-gray-600 min-w-[60px] text-center">0 / 0</span>
+                <button id="next-btn" class="btn-custom">Następna</button>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <button id="play-btn" class="btn-custom">
+                        <span id="play-icon">▶</span> Play
+                    </button>
+                    <div class="flex flex-col items-center">
+                        <input type="range" id="speed-slider" class="range-slider" min="1000" max="10000" step="500" value="3000">
+                        <span class="text-[10px] mt-1 text-gray-600">Prędkość</span>
+                    </div>
+                </div>
+
+                <button id="fullscreen-btn" class="btn-custom border-dashed">
+                    Fullscreen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kontener na Flipbook -->
+    <div id="canvas-container">
+        <div id="book-container" class="flip-book">
+            <!-- Tutaj dynamicznie wskoczą strony -->
+        </div>
+        
+        <div id="placeholder" class="text-center">
+            <h2 class="text-xl font-light mb-2 text-gray-400">Cyfrowa Kronika Szkolna</h2>
+            <p class="text-sm text-gray-600">Wybierz skany, aby rozpocząć prezentację.</p>
+        </div>
+    </div>
+
+    <!-- Pasek postępu na samym dole -->
+    <div id="progress-container">
+        <div id="progress-bar"></div>
+    </div>
+
+    <script>
+        let pageFlip = null;
+        let autoplayInterval = null;
+        let isPlaying = false;
+
+        const fileUpload = document.getElementById('file-upload');
+        const bookContainer = document.getElementById('book-container');
+        const placeholder = document.getElementById('placeholder');
+        const progressBar = document.getElementById('progress-bar');
+        const pageIndicator = document.getElementById('page-indicator');
+        const playBtn = document.getElementById('play-btn');
+        const playIcon = document.getElementById('play-icon');
+        const speedSlider = document.getElementById('speed-slider');
+
+        fileUpload.addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+            files.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
+            renderBook(files);
+        });
+
+        async function renderBook(files) {
+            if (pageFlip) {
+                stopAutoplay();
+                pageFlip.destroy();
+                bookContainer.innerHTML = '';
+            }
+
+            placeholder.style.display = 'none';
+            bookContainer.style.display = 'block';
+
+            for (let i = 0; i < files.length; i++) {
+                const url = URL.createObjectURL(files[i]);
+                const pageDiv = document.createElement('div');
+                pageDiv.className = 'page';
+                pageDiv.innerHTML = `
+                    <div class="page-content">
+                        <img src="${url}" alt="Strona ${i + 1}">
+                    </div>
+                `;
+                bookContainer.appendChild(pageDiv);
+            }
+
+            pageFlip = new St.PageFlip(bookContainer, {
+                width: 600,
+                height: 800,
+                size: "stretch",
+                minWidth: 315,
+                maxWidth: 1000,
+                minHeight: 420,
+                maxHeight: 1350,
+                maxShadowOpacity: 0.3,
+                showCover: true,
+                mobileScrollSupport: false
+            });
+
+            pageFlip.loadFromHTML(document.querySelectorAll('.page'));
+
+            const updateUI = (e) => {
+                const totalPages = pageFlip.getPageCount();
+                const currentPage = pageFlip.getCurrentPageIndex() + 1;
+                const progress = (currentPage / totalPages) * 100;
+                
+                progressBar.style.width = `${progress}%`;
+                pageIndicator.textContent = `${currentPage} / ${totalPages}`;
+
+                // Zatrzymaj autoplay na ostatniej stronie
+                if (isPlaying && currentPage === totalPages) {
+                    stopAutoplay();
+                }
+            };
+
+            pageFlip.on('flip', updateUI);
+            pageFlip.on('init', updateUI);
+
+            document.getElementById('prev-btn').onclick = () => { stopAutoplay(); pageFlip.flipPrev(); };
+            document.getElementById('next-btn').onclick = () => { stopAutoplay(); pageFlip.flipNext(); };
+        }
+
+        // Logika Autoplay
+        function startAutoplay() {
+            if (!pageFlip) return;
+            isPlaying = true;
+            playBtn.classList.add('btn-active');
+            playIcon.textContent = '■';
+            playBtn.childNodes[2].textContent = ' Stop';
+            
+            autoplayInterval = setInterval(() => {
+                if (pageFlip.getCurrentPageIndex() < pageFlip.getPageCount() - 1) {
+                    pageFlip.flipNext();
+                } else {
+                    stopAutoplay();
+                }
+            }, parseInt(speedSlider.value));
+        }
+
+        function stopAutoplay() {
+            isPlaying = false;
+            if (autoplayInterval) clearInterval(autoplayInterval);
+            playBtn.classList.remove('btn-active');
+            playIcon.textContent = '▶';
+            playBtn.childNodes[2].textContent = ' Play';
+        }
+
+        playBtn.addEventListener('click', () => {
+            if (isPlaying) stopAutoplay();
+            else startAutoplay();
+        });
+
+        // Dynamiczna zmiana prędkości
+        speedSlider.addEventListener('input', () => {
+            if (isPlaying) {
+                stopAutoplay();
+                startAutoplay();
+            }
+        });
+
+        document.getElementById('fullscreen-btn').addEventListener('click', () => {
+            const elem = document.documentElement;
+            if (!document.fullscreenElement) {
+                elem.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            if (pageFlip) pageFlip.update();
+        });
+    </script>
+</body>
+</html>
