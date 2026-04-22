@@ -324,6 +324,23 @@
         window.addEventListener('resize', () => {
             if (pageFlip) pageFlip.update();
         });
+
+document.addEventListener('keydown', (e) => {
+    if (!pageFlip) return;
+
+    if (e.key === 'ArrowRight') {
+        stopAutoplay();
+        pageFlip.flipNext();
+    }
+
+    if (e.key === 'ArrowLeft') {
+        stopAutoplay();
+        pageFlip.flipPrev();
+    }
+});
+
+
+
     </script>
 </body>
 </html>
