@@ -140,9 +140,67 @@
         :fullscreen #main-ui:hover {
             opacity: 1;
         }
+
+        /* Przycisk hamburgera */
+        #menu-toggle {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+            background: rgba(24, 24, 24, 0.8);
+            border: 1px solid #333;
+            color: #9ca3af;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            transition: all 0.3s;
+        }
+        
+        #menu-toggle:hover {
+            background: #262626;
+            color: #fff;
+        }
+
+        #main-ui {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 90;
+            transition: transform 0.3s ease;
+        }
+
+        #main-ui.hidden-menu {
+            transform: translateY(-100%);
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            padding-top: 70px;
+            transition: padding-top 0.3s ease;
+        }
+
+        #canvas-container.no-padding {
+            padding-top: 20px;
+        }
     </style>
 </head>
 <body>
+
+    <!-- Przycisk menu (hamburger) -->
+    <button id="menu-toggle" title="Przełącz menu">
+        <span id="toggle-icon" class="text-xl">✕</span>
+    </button>
 
     <!-- Górny panel / Menu -->
     <div id="main-ui">
@@ -174,6 +232,11 @@
                 <button id="fullscreen-btn" class="btn-custom border-dashed">
                     Fullscreen
                 </button>
+
+                <div class="flex items-center gap-2 px-2 border-l border-gray-800">
+                    <input type="checkbox" id="loop-checkbox" class="w-4 h-4 accent-indigo-600 cursor-pointer">
+                    <label for="loop-checkbox" class="text-[10px] uppercase tracking-wider text-gray-500 cursor-pointer select-none">Pętla</label>
+                </div>
             </div>
         </div>
     </div>
@@ -208,6 +271,7 @@
         const playBtn = document.getElementById('play-btn');
         const playIcon = document.getElementById('play-icon');
         const speedSlider = document.getElementById('speed-slider');
+        const loopCheckbox = document.getElementById('loop-checkbox');
 
         fileUpload.addEventListener('change', function(e) {
             const files = Array.from(e.target.files);
@@ -261,8 +325,8 @@
                 progressBar.style.width = `${progress}%`;
                 pageIndicator.textContent = `${currentPage} / ${totalPages}`;
 
-                // Zatrzymaj autoplay na ostatniej stronie
-                if (isPlaying && currentPage === totalPages) {
+                // Zatrzymaj autoplay na ostatniej stronie (jeśli pętla wyłączona)
+                if (isPlaying && currentPage === totalPages && !loopCheckbox.checked) {
                     stopAutoplay();
                 }
             };
@@ -270,8 +334,23 @@
             pageFlip.on('flip', updateUI);
             pageFlip.on('init', updateUI);
 
-            document.getElementById('prev-btn').onclick = () => { stopAutoplay(); pageFlip.flipPrev(); };
-            document.getElementById('next-btn').onclick = () => { stopAutoplay(); pageFlip.flipNext(); };
+            document.getElementById('prev-btn').onclick = () => { 
+                stopAutoplay(); 
+                if (pageFlip.getCurrentPageIndex() === 0 && loopCheckbox.checked) {
+                    pageFlip.flip(pageFlip.getPageCount() - 1);
+                } else {
+                    pageFlip.flipPrev(); 
+                }
+            };
+            
+            document.getElementById('next-btn').onclick = () => { 
+                stopAutoplay(); 
+                if (pageFlip.getCurrentPageIndex() === pageFlip.getPageCount() - 1 && loopCheckbox.checked) {
+                    pageFlip.flip(0);
+                } else {
+                    pageFlip.flipNext(); 
+                }
+            };
         }
 
         // Logika Autoplay
@@ -283,8 +362,13 @@
             playBtn.childNodes[2].textContent = ' Stop';
             
             autoplayInterval = setInterval(() => {
-                if (pageFlip.getCurrentPageIndex() < pageFlip.getPageCount() - 1) {
+                const currentIndex = pageFlip.getCurrentPageIndex();
+                const totalPages = pageFlip.getPageCount();
+
+                if (currentIndex < totalPages - 1) {
                     pageFlip.flipNext();
+                } else if (loopCheckbox.checked) {
+                    pageFlip.flip(0);
                 } else {
                     stopAutoplay();
                 }
@@ -330,16 +414,38 @@ document.addEventListener('keydown', (e) => {
 
     if (e.key === 'ArrowRight') {
         stopAutoplay();
-        pageFlip.flipNext();
+        if (pageFlip.getCurrentPageIndex() === pageFlip.getPageCount() - 1 && loopCheckbox.checked) {
+            pageFlip.flip(0);
+        } else {
+            pageFlip.flipNext();
+        }
     }
 
     if (e.key === 'ArrowLeft') {
         stopAutoplay();
-        pageFlip.flipPrev();
+        if (pageFlip.getCurrentPageIndex() === 0 && loopCheckbox.checked) {
+            pageFlip.flip(pageFlip.getPageCount() - 1);
+        } else {
+            pageFlip.flipPrev();
+        }
     }
 });
 
+        // Obsługa menu hamburgerowego
+        const menuToggle = document.getElementById('menu-toggle');
+        const mainUi = document.getElementById('main-ui');
+        const canvasContainer = document.getElementById('canvas-container');
+        const toggleIcon = document.getElementById('toggle-icon');
 
+        menuToggle.addEventListener('click', () => {
+            mainUi.classList.toggle('hidden-menu');
+            canvasContainer.classList.toggle('no-padding');
+            if (mainUi.classList.contains('hidden-menu')) {
+                toggleIcon.textContent = '☰';
+            } else {
+                toggleIcon.textContent = '✕';
+            }
+        });
 
     </script>
 </body>
