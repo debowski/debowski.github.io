@@ -13,19 +13,16 @@
             color: #9ca3af;
             overflow: hidden;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            height: 80vh;
         }
 
         /* Kontener dla książki */
         #canvas-container {
-            flex: 1;
+            width: 100vw;
+            height: calc(100vh - 60px);
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 0px;
-            transition: all 0.3s ease;
+            padding: 20px;
         }
 
         .flip-book {
@@ -42,7 +39,7 @@
 
         .page-content {
             width: 100%;
-            height:100%;
+            height: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -63,37 +60,7 @@
             justify-content: center;
             gap: 20px;
             border-top: 1px solid #262626;
-            transition: all 0.3s ease;
-            overflow: hidden;
-        }
-
-        .controls.minimized {
-            height: 0;
-            opacity: 0;
-            border: none;
-            pointer-events: none;
-        }
-
-        #hamburger-btn {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            z-index: 100;
-            background: #181818;
-            border: 1px solid #262626;
-            color: #9ca3af;
-            padding: 8px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        #hamburger-btn:hover {
-            color: #e5e7eb;
-            background: #262626;
+            transition: opacity 0.3s;
         }
 
         .btn-custom {
@@ -176,11 +143,6 @@
     </style>
 </head>
 <body>
-
-    <!-- Przycisk Hamburgera -->
-    <button id="hamburger-btn" title="Pokaż/Ukryj Menu">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-    </button>
 
     <!-- Górny panel / Menu -->
     <div id="main-ui">
@@ -361,18 +323,6 @@
 
         window.addEventListener('resize', () => {
             if (pageFlip) pageFlip.update();
-        });
-
-        // Obsługa Hamburgera
-        const hamburgerBtn = document.getElementById('hamburger-btn');
-        const controls = document.querySelector('.controls');
-
-        hamburgerBtn.addEventListener('click', () => {
-            controls.classList.toggle('minimized');
-            // Wywołaj update na pageFlip jeśli istnieje, by dostosować rozmiar po schowaniu menu
-            setTimeout(() => {
-                if (pageFlip) pageFlip.update();
-            }, 350); // Czekamy na zakończenie transition (0.3s)
         });
     </script>
 </body>
