@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wirtualna Książka - turn.js</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            font-weight: 300;
+            letter-spacing: 2px;
+            color: #e94560;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.2);
+            width: 100%;
+        }
+
+        .controls button,
+        .controls label {
+            padding: 10px 20px;
+            border: 1px solid rgba(233, 69, 96, 0.4);
+            background: rgba(233, 69, 96, 0.1);
+            color: #e0e0e0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        .controls button:hover,
+        .controls label:hover {
+            background: rgba(233, 69, 96, 0.25);
+            border-color: #e94560;
+        }
+
+        .controls button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .controls input[type="file"] {
+            display: none;
+        }
+
+        .page-info {
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            font-size: 0.9rem;
+            color: #a0a0a0;
+        }
+
+        #book-viewport {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 30px 20px;
+            width: 100%;
+        }
+
+        #flipbook {
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        #flipbook .page {
+            background: #fff;
+            overflow: hidden;
+        }
+
+        #flipbook .page img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        #flipbook .page .page-content {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(145deg, #f5f5dc 0%, #faf0e6 100%);
+            color: #333;
+            font-size: 1.2rem;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #placeholder {
+            text-align: center;
+            padding: 60px 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            backdrop-filter: blur(5px);
+        }
+
+        #placeholder h2 {
+            font-size: 2rem;
+            font-weight: 300;
+            margin-bottom: 16px;
+            color: #e94560;
+        }
+
+        #placeholder p {
+            font-size: 1.1rem;
+            color: #a0a0a0;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.4rem;
+            }
+            .controls button,
+            .controls label {
+                padding: 8px 14px;
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Wirtualna Książka</h1>
+    </header>
+
+    <div class="controls">
+        <label for="file-upload">Wgraj zdjęcia</label>
+        <input id="file-upload" type="file" accept="image/*" multiple>
+        <button id="prev-btn" disabled>&#8592; Poprzednia</button>
+        <button id="next-btn" disabled>Następna &#8594;</button>
+        <button id="play-btn" disabled>&#9654; Odtwarzaj</button>
+        <div class="page-info">
+            <span id="page-indicator">0 / 0</span>
+        </div>
+    </div>
+
+    <div id="book-viewport">
+        <div id="placeholder">
+            <h2>Witaj w wirtualnej książce</h2>
+            <p>Wgraj zdjęcia, aby stworzyć interaktywną książkę z efektem przewracania stron.</p>
+        </div>
+        <div id="flipbook"></div>
+    </div>
+
+    <script src="lib/jquery.min.js"></script>
+    <script src="lib/turn.min.js"></script>
+    <script>
+        const $fileUpload = $('#file-upload');
+        const $prevBtn = $('#prev-btn');
+        const $nextBtn = $('#next-btn');
+        const $playBtn = $('#play-btn');
+        const $pageIndicator = $('#page-indicator');
+        const $placeholder = $('#placeholder');
+        const $flipbook = $('#flipbook');
+
+        let autoplayInterval = null;
+        let isPlaying = false;
+        let bookInitialized = false;
+
+        function updateIndicator() {
+            if (!bookInitialized) return;
+            const current = $flipbook.turn('page');
+            const total = $flipbook.turn('pages');
+            $pageIndicator.text(current + ' / ' + total);
+            $prevBtn.prop('disabled', current === 1);
+            $nextBtn.prop('disabled', current === total);
+        }
+
+        function stopAutoplay() {
+            if (autoplayInterval) {
+                clearInterval(autoplayInterval);
+                autoplayInterval = null;
+            }
+            isPlaying = false;
+            $playBtn.html('&#9654; Odtwarzaj');
+        }
+
+        function startAutoplay() {
+            if (!bookInitialized) return;
+            isPlaying = true;
+            $playBtn.html('&#9632; Zatrzymaj');
+            autoplayInterval = setInterval(function() {
+                const current = $flipbook.turn('page');
+                const total = $flipbook.turn('pages');
+                if (current < total) {
+                    $flipbook.turn('next');
+                } else {
+                    $flipbook.turn('page', 1);
+                }
+            }, 2500);
+        }
+
+        function createBook(files) {
+            stopAutoplay();
+
+            if (bookInitialized) {
+                $flipbook.turn('destroy');
+                $flipbook.empty();
+                bookInitialized = false;
+            }
+
+            $placeholder.addClass('hidden');
+
+            var sortedFiles = Array.from(files).sort(function(a, b) {
+                return a.name.localeCompare(b.name, undefined, { numeric: true });
+            });
+
+            sortedFiles.forEach(function(file) {
+                var url = URL.createObjectURL(file);
+                var $page = $('<div class="page"></div>');
+                $('<img>').attr('src', url).appendTo($page);
+                $flipbook.append($page);
+            });
+
+            if (sortedFiles.length % 2 !== 0) {
+                $flipbook.append('<div class="page"><div class="page-content">Koniec książki</div></div>');
+            }
+
+            var viewportWidth = Math.min(window.innerWidth - 40, 1100);
+            var viewportHeight = Math.min(window.innerHeight - 200, 750);
+
+            setTimeout(function() {
+                $flipbook.turn({
+                    width: viewportWidth,
+                    height: viewportHeight,
+                    autoCenter: true,
+                    duration: 700,
+                    gradients: true,
+                    acceleration: true,
+                    when: {
+                        turned: function() {
+                            updateIndicator();
+                        }
+                    }
+                });
+
+                bookInitialized = true;
+                $playBtn.prop('disabled', false);
+                updateIndicator();
+            }, 100);
+        }
+
+        $fileUpload.on('change', function(e) {
+            if (e.target.files.length > 0) {
+                createBook(e.target.files);
+            }
+        });
+
+        $prevBtn.on('click', function() {
+            stopAutoplay();
+            if (bookInitialized) {
+                $flipbook.turn('previous');
+            }
+        });
+
+        $nextBtn.on('click', function() {
+            stopAutoplay();
+            if (bookInitialized) {
+                $flipbook.turn('next');
+            }
+        });
+
+        $playBtn.on('click', function() {
+            if (isPlaying) {
+                stopAutoplay();
+            } else {
+                startAutoplay();
+            }
+        });
+
+        $(window).on('resize', function() {
+            if (bookInitialized) {
+                var w = Math.min(window.innerWidth - 40, 1100);
+                var h = Math.min(window.innerHeight - 200, 750);
+                $flipbook.turn('size', w, h);
+            }
+        });
+
+        $(document).on('keydown', function(e) {
+            if (!bookInitialized) return;
+            if (e.key === 'ArrowRight') {
+                stopAutoplay();
+                $nextBtn.click();
+            } else if (e.key === 'ArrowLeft') {
+                stopAutoplay();
+                $prevBtn.click();
+            }
+        });
+    </script>
+</body>
+</html>
