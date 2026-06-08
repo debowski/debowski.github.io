@@ -26,7 +26,7 @@
         }
 
         .flip-book {
-            box-shadow: 0 0 50px rgba(0, 0, 0, 0.7);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 10px rgba(0, 0, 0, 0.5);
             background-size: cover;
             display: none;
         }
@@ -34,7 +34,6 @@
         .page {
             background-color: #fcfaf5;
             overflow: hidden;
-            border: 1px solid #d1d1d1;
         }
 
         .page-content {
@@ -263,6 +262,39 @@
         let pageFlip = null;
         let autoplayTimeout = null;
         let isPlaying = false;
+        let availableTextures = ['1.png', '2.png', '3.png', '4.png'];
+
+        // Wykrywanie dostępnych tekstur w folderze flip_textury (sprawdzanie 1.png do 20.png dla formatów png, jpg, jpeg)
+        async function detectTextures() {
+            const detected = [];
+            const promises = [];
+            const extensions = ['png', 'jpg', 'jpeg'];
+            
+            for (let i = 1; i <= 20; i++) {
+                extensions.forEach(ext => {
+                    promises.push(new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            detected.push(`${i}.${ext}`);
+                            resolve();
+                        };
+                        img.onerror = () => {
+                            resolve();
+                        };
+                        img.src = `flip_textury/${i}.${ext}`;
+                    }));
+                });
+            }
+            
+            await Promise.all(promises);
+            
+            if (detected.length > 0) {
+                detected.sort((a, b) => parseInt(a) - parseInt(b));
+                availableTextures = detected;
+            }
+        }
+        
+        detectTextures();
 
         const fileUpload = document.getElementById('file-upload');
         const bookContainer = document.getElementById('book-container');
@@ -296,19 +328,22 @@
                 const url = URL.createObjectURL(file);
                 const pageDiv = document.createElement('div');
                 pageDiv.className = 'page';
+
+                // Losowy wybór tła z dostępnych tekstur
+                const randomTexture = availableTextures[Math.floor(Math.random() * availableTextures.length)];
                 
                 const isVideo = file.type.startsWith('video/') || 
                                 /\.(mp4|webm|ogg|mov|avi|mkv)$/i.test(file.name);
 
                 if (isVideo) {
                     pageDiv.innerHTML = `
-                        <div class="page-content">
+                        <div class="page-content" style="background-image: url('flip_textury/${randomTexture}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
                             <video src="${url}" muted playsinline preload="auto" class="max-w-full max-h-full object-contain"></video>
                         </div>
                     `;
                 } else {
                     pageDiv.innerHTML = `
-                        <div class="page-content">
+                        <div class="page-content" style="background-image: url('flip_textury/${randomTexture}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
                             <img src="${url}" alt="Strona ${i + 1}">
                         </div>
                     `;
@@ -324,8 +359,8 @@
                 maxWidth: 1000,
                 minHeight: 420,
                 maxHeight: 1350,
-                maxShadowOpacity: 0,
-                drawShadow: false,
+                maxShadowOpacity: 0.5,
+                drawShadow: true,
                 flippingTime: 600,
                 showCover: true,
                 mobileScrollSupport: false
