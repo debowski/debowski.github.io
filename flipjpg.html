@@ -6,6 +6,7 @@
     <title>Wirtualna Kronika Szkolna - Flipbook</title>
     <!-- Biblioteka Strona-Po-Stronie (PageFlip) -->
     <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -104,7 +105,7 @@
             appearance: none;
             width: 12px;
             height: 12px;
-            background: #4f46e5;
+            background: #5d5d5d;
             cursor: pointer;
             border-radius: 50%;
         }
@@ -123,7 +124,7 @@
         #progress-bar {
             width: 0%;
             height: 100%;
-            background: #4f46e5;
+            background: #555555;
             transition: width 0.3s ease;
             box-shadow: 0 0 8px rgba(79, 70, 229, 0.4);
         }
@@ -148,8 +149,8 @@
             right: 10px;
             z-index: 100;
             background: rgba(24, 24, 24, 0.8);
-            border: 1px solid #333;
-            color: #9ca3af;
+            border: 1px solid #121212;
+            color: #363636;
             width: 40px;
             height: 40px;
             border-radius: 8px;
@@ -193,6 +194,52 @@
         #canvas-container.no-padding {
             padding-top: 20px;
         }
+
+        /* Boczny panel */
+        #sidebar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 320px;
+            height: 100vh;
+            background: #181818;
+            border-left: 1px solid #262626;
+            z-index: 105; /* Więcej niż menu-toggle */
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+        }
+
+        #sidebar.sidebar-hidden {
+            transform: translateX(100%);
+        }
+
+        #sortable-list li {
+            background: #262626;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #d1d5db;
+            font-size: 0.9rem;
+            border: 1px solid #333;
+        }
+        
+        #sortable-list li:active {
+            cursor: grabbing;
+        }
+
+        .thumbnail {
+            width: 40px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: 4px;
+            background: #000;
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
@@ -221,7 +268,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2">
                     <button id="play-btn" class="btn-custom">
-                        <span id="play-icon">▶</span> Play
+                        <span id="play-icon">▶</span> Play F8
                     </button>
                     <div class="flex flex-col items-center">
                         <input type="range" id="speed-slider" class="range-slider" min="1000" max="10000" step="500" value="3000">
@@ -231,6 +278,10 @@
 
                 <button id="fullscreen-btn" class="btn-custom border-dashed">
                     Fullscreen
+                </button>
+
+                <button id="toggle-sidebar" class="btn-custom border-dashed">
+                    Kolejność
                 </button>
 
                 <div class="flex items-center gap-2 px-2 border-l border-gray-800">
@@ -258,11 +309,30 @@
         <div id="progress-bar"></div>
     </div>
 
+    <!-- Boczny panel (Sidebar) -->
+    <div id="sidebar" class="sidebar-hidden">
+        <div class="p-4 border-b border-gray-800 flex justify-between items-center">
+            <h3 class="text-gray-200 font-semibold text-lg">Kolejność stron</h3>
+            <button id="close-sidebar" class="text-gray-400 hover:text-white text-xl">✕</button>
+        </div>
+        <div class="p-4 overflow-y-auto flex-1">
+            <ul id="sortable-list" class="space-y-2">
+                <!-- Elementy listy dodawane dynamicznie -->
+            </ul>
+        </div>
+        <div class="p-4 border-t border-gray-800">
+            <button id="apply-order" class="w-full btn-custom border-indigo-600 bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 justify-center">
+                Zatwierdź i Odśwież
+            </button>
+        </div>
+    </div>
+
     <script>
         let pageFlip = null;
         let autoplayTimeout = null;
         let isPlaying = false;
         let availableTextures = ['1.png', '2.png', '3.png', '4.png'];
+        let currentFiles = [];
 
         // Wykrywanie dostępnych tekstur w folderze flip_textury (sprawdzanie 1.png do 20.png dla formatów png, jpg, jpeg)
         async function detectTextures() {
@@ -297,7 +367,7 @@
         detectTextures();
 
         const fileUpload = document.getElementById('file-upload');
-        const bookContainer = document.getElementById('book-container');
+        let bookContainer = document.getElementById('book-container');
         const placeholder = document.getElementById('placeholder');
         const progressBar = document.getElementById('progress-bar');
         const pageIndicator = document.getElementById('page-indicator');
@@ -310,13 +380,29 @@
             const files = Array.from(e.target.files);
             if (files.length === 0) return;
             files.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
-            renderBook(files);
+            currentFiles = currentFiles.concat(files);
+            updateSortableList();
+            renderBook(currentFiles);
+            e.target.value = '';
         });
 
         async function renderBook(files) {
             if (pageFlip) {
                 stopAutoplay();
                 pageFlip.destroy();
+                pageFlip = null;
+                
+                if (bookContainer) {
+                    bookContainer.remove();
+                }
+                
+                bookContainer = document.createElement('div');
+                bookContainer.id = 'book-container';
+                bookContainer.className = 'flip-book';
+                
+                const canvasContainer = document.getElementById('canvas-container');
+                canvasContainer.insertBefore(bookContainer, document.getElementById('placeholder'));
+            } else {
                 bookContainer.innerHTML = '';
             }
 
@@ -352,8 +438,8 @@
             }
 
             pageFlip = new St.PageFlip(bookContainer, {
-                width: 600,
-                height: 800,
+                width: 1080,
+                height: 1180,
                 size: "stretch",
                 minWidth: 315,
                 maxWidth: 1000,
@@ -366,7 +452,7 @@
                 mobileScrollSupport: false
             });
 
-            pageFlip.loadFromHTML(document.querySelectorAll('.page'));
+            pageFlip.loadFromHTML(bookContainer.querySelectorAll('.page'));
 
             const updateUI = (e) => {
                 const totalPages = pageFlip.getPageCount();
@@ -375,11 +461,6 @@
                 
                 progressBar.style.width = `${progress}%`;
                 pageIndicator.textContent = `${currentPage} / ${totalPages}`;
-
-                // Zatrzymaj autoplay na ostatniej stronie (jeśli pętla wyłączona)
-                if (isPlaying && currentPage === totalPages && !loopCheckbox.checked) {
-                    stopAutoplay();
-                }
             };
 
             pageFlip.on('flip', (e) => {
@@ -416,7 +497,7 @@
             
             document.getElementById('next-btn').onclick = () => { 
                 stopAutoplay(); 
-                if (pageFlip.getCurrentPageIndex() === pageFlip.getPageCount() - 1 && loopCheckbox.checked) {
+                if (isLastView() && loopCheckbox.checked) {
                     pageFlip.flip(0);
                 } else {
                     pageFlip.flipNext(); 
@@ -435,7 +516,7 @@
                 }
                 video.onended = null;
                 video.onerror = null;
-                video.loop = !isPlaying;
+                video.loop = false;
             });
 
             const currentIndex = pageFlip.getCurrentPageIndex();
@@ -542,12 +623,18 @@
             }
         }
 
-        function goToNextPageOrStop() {
-            if (!isPlaying) return;
+        function isLastView() {
+            if (!pageFlip) return false;
             const currentIndex = pageFlip.getCurrentPageIndex();
             const totalPages = pageFlip.getPageCount();
+            const orientation = pageFlip.getOrientation();
+            return orientation === 'portrait' ? currentIndex >= totalPages - 1 : currentIndex >= totalPages - 2;
+        }
 
-            if (currentIndex < totalPages - 1) {
+        function goToNextPageOrStop() {
+            if (!isPlaying) return;
+            
+            if (!isLastView()) {
                 pageFlip.flipNext();
             } else if (loopCheckbox.checked) {
                 pageFlip.flip(0);
@@ -573,7 +660,7 @@
             videos.forEach(video => {
                 video.onended = null;
                 video.onerror = null;
-                video.loop = true;
+                video.loop = false;
             });
             playBtn.classList.remove('btn-active');
             playIcon.textContent = '▶';
@@ -611,7 +698,7 @@ document.addEventListener('keydown', (e) => {
 
     if (e.key === 'ArrowRight') {
         stopAutoplay();
-        if (pageFlip.getCurrentPageIndex() === pageFlip.getPageCount() - 1 && loopCheckbox.checked) {
+        if (isLastView() && loopCheckbox.checked) {
             pageFlip.flip(0);
         } else {
             pageFlip.flipNext();
@@ -625,6 +712,12 @@ document.addEventListener('keydown', (e) => {
         } else {
             pageFlip.flipPrev();
         }
+    }
+
+    if (e.key === 'F8') {
+        e.preventDefault();
+        if (isPlaying) stopAutoplay();
+        else startAutoplay();
     }
 });
 
@@ -642,6 +735,88 @@ document.addEventListener('keydown', (e) => {
             } else {
                 toggleIcon.textContent = '✕';
             }
+        });
+
+        // Obsługa bocznego panelu i sortowania
+        const sidebar = document.getElementById('sidebar');
+        const toggleSidebarBtn = document.getElementById('toggle-sidebar');
+        const closeSidebarBtn = document.getElementById('close-sidebar');
+        const sortableList = document.getElementById('sortable-list');
+        const applyOrderBtn = document.getElementById('apply-order');
+        let sortableInstance = null;
+
+        toggleSidebarBtn.addEventListener('click', () => {
+            sidebar.classList.remove('sidebar-hidden');
+        });
+
+        closeSidebarBtn.addEventListener('click', () => {
+            sidebar.classList.add('sidebar-hidden');
+        });
+
+        function updateSortableList() {
+            sortableList.innerHTML = '';
+            currentFiles.forEach((file, index) => {
+                const li = document.createElement('li');
+                li.dataset.index = index;
+                
+                const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|ogg|mov|avi|mkv)$/i.test(file.name);
+                const url = URL.createObjectURL(file);
+                
+                if (isVideo) {
+                    li.innerHTML = `<video src="${url}" class="thumbnail" muted></video> <span class="truncate flex-1">${file.name}</span>`;
+                } else {
+                    li.innerHTML = `<img src="${url}" class="thumbnail"> <span class="truncate flex-1">${file.name}</span>`;
+                }
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = '✕';
+                deleteBtn.className = 'text-gray-500 hover:text-red-500 transition-colors p-1 ml-2 text-lg font-bold';
+                deleteBtn.title = 'Usuń plik';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    
+                    // Zsynchronizuj tablicę currentFiles z obecnym układem w liście przed usunięciem
+                    if (sortableInstance) {
+                        const newOrderIndices = Array.from(sortableList.children).map(item => parseInt(item.dataset.index));
+                        currentFiles = newOrderIndices.map(idx => currentFiles[idx]);
+                    }
+                    
+                    // Znajdź indeks elementu li, w który kliknięto i usuń
+                    const liIndex = Array.from(sortableList.children).indexOf(li);
+                    if (liIndex !== -1) {
+                        currentFiles.splice(liIndex, 1);
+                        updateSortableList();
+                    }
+                };
+                li.appendChild(deleteBtn);
+                
+                sortableList.appendChild(li);
+            });
+
+            if (sortableInstance) {
+                sortableInstance.destroy();
+            }
+
+            sortableInstance = new Sortable(sortableList, {
+                animation: 150,
+                ghostClass: 'opacity-50'
+            });
+        }
+
+        applyOrderBtn.addEventListener('click', () => {
+            if (!sortableInstance) return;
+            
+            const newOrderIndices = Array.from(sortableList.children).map(li => parseInt(li.dataset.index));
+            const newFiles = newOrderIndices.map(index => currentFiles[index]);
+            currentFiles = newFiles;
+            
+            // Aktualizacja atrybutów index
+            Array.from(sortableList.children).forEach((li, i) => {
+                li.dataset.index = i;
+            });
+            
+            renderBook(currentFiles);
+            sidebar.classList.add('sidebar-hidden');
         });
 
     </script>
