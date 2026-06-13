@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Show Control - Operator Console</title>
+    <meta name="description" content="Professional application for managing multimedia projection during live events, shows, presentations, and concerts.">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎛️</text></svg>">
+</head>
+<body>
+    <div class="background-effects">
+        <div class="glow-blob blob-1"></div>
+        <div class="glow-blob blob-2"></div>
+    </div>
+
+    <nav class="navbar glass">
+        <div class="logo">Show Control <span class="version">v0.3</span></div>
+        <div class="lang-switch">
+            <button id="btn-en" onclick="setLanguage('en')">EN</button>
+            <button id="btn-pl" onclick="setLanguage('pl')" class="active">PL</button>
+        </div>
+    </nav>
+
+    <main>
+        <header class="hero">
+            <div class="hero-content">
+                <div class="badge" data-i18n="hero_badge">Broadcast Edition</div>
+                <h1 data-i18n="hero_title">Profesjonalna kontrola nad Twoim wydarzeniem</h1>
+                <p data-i18n="hero_subtitle">Aplikacja do zarządzania projekcją multimediów (wideo, audio, grafika) podczas wydarzeń na żywo, pokazów, prezentacji i koncertów.</p>
+                <div class="cta-group">
+                    <a href="https://github.com/debowski/Show-control/releases" class="cta-button primary" target="_blank" rel="noopener">
+                        <span class="icon">⬇️</span> <span data-i18n="download_btn">Pobierz Wersję .exe</span>
+                    </a>
+                    <a href="https://github.com/debowski/Show-control" class="cta-button secondary" target="_blank" rel="noopener">
+                        <span class="icon">⌨️</span> <span data-i18n="source_btn">Kod Źródłowy</span>
+                    </a>
+                </div>
+            </div>
+            <div class="hero-image glass-panel">
+                <img src="aplikacja_v03b.png" alt="Show Control Interface" id="app-preview">
+            </div>
+        </header>
+
+        <section class="features">
+            <h2 class="section-title" data-i18n="features_title">Kluczowe Możliwości</h2>
+            <div class="features-grid">
+                <div class="feature-card glass-panel">
+                    <div class="icon">🖥️</div>
+                    <h3 data-i18n="feat_dual_title">Dwuekranowy Tryb Pracy</h3>
+                    <p data-i18n="feat_dual_desc">Operator steruje listą odtwarzania na jednym ekranie (konsola), podczas gdy obraz właściwy wyświetlany jest na drugim monitorze lub projektorze.</p>
+                </div>
+                <div class="feature-card glass-panel">
+                    <div class="icon">🎬</div>
+                    <h3 data-i18n="feat_vlc_title">Potężny Silnik LibVLC</h3>
+                    <p data-i18n="feat_vlc_desc">Bezproblemowe odtwarzanie wideo (MP4, MKV), audio (MP3, WAV) oraz grafik z wyjściem Direct3D11 i WaveOut dla najwyższej stabilności.</p>
+                </div>
+                <div class="feature-card glass-panel">
+                    <div class="icon">✨</div>
+                    <h3 data-i18n="feat_fade_title">Płynne Przejścia (Fade Out)</h3>
+                    <p data-i18n="feat_fade_desc">Zatrzymanie materiału z konfigurowalnym efektem Fade (0.2s - 2.0s) - ściemnienie obrazu i wyciszenie dźwięku bez drastycznych cięć.</p>
+                </div>
+                <div class="feature-card glass-panel">
+                    <div class="icon">📋</div>
+                    <h3 data-i18n="feat_playlist_title">Zaawansowana Playlista</h3>
+                    <p data-i18n="feat_playlist_desc">Drag & drop, wyszukiwanie na żywo w trakcie odtwarzania, oznaczanie nakładek per-plik i pełne zapisywanie projektów do JSON.</p>
+                </div>
+                <div class="feature-card glass-panel">
+                    <div class="icon">🖼️</div>
+                    <h3 data-i18n="feat_overlay_title">System Nakładek (Logo)</h3>
+                    <p data-i18n="feat_overlay_desc">Niezależny odtwarzacz pozwala na wyświetlanie logo, grafik statycznych lub wideo w nieskończonej pętli bez dźwięku w tle głównej projekcji.</p>
+                </div>
+                <div class="feature-card glass-panel">
+                    <div class="icon">🛡️</div>
+                    <h3 data-i18n="feat_safety_title">Stabilność i Bezpieczeństwo</h3>
+                    <p data-i18n="feat_safety_desc">Mechanizmy self-healing, ochrona HWND okna projekcji przed przypadkowym zamknięciem i bezbłędna obsługa wyjątków w trakcie trwania eventu.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="themes glass-panel">
+            <h2 data-i18n="themes_title">Cztery Motywy Interfejsu</h2>
+            <p data-i18n="themes_desc">Dopasuj aplikację do warunków oświetleniowych panujących w reżyserce.</p>
+            <div class="themes-list">
+                <span class="theme-badge" style="background: #1e1e1e; color: #007acc; border-color: #3c3c3c;">Studio Dark</span>
+                <span class="theme-badge" style="background: #f0f0f0; color: #0063b1; border-color: #b0b0b0;">Studio Light</span>
+                <span class="theme-badge" style="background: #0a0000; color: #cc0000; border-color: #3a0000;">Red Night (Stealth)</span>
+                <span class="theme-badge" style="background: #12131f; color: #6c63ff; border-color: #3a3a5c; box-shadow: 0 0 10px rgba(108, 99, 255, 0.4);">Broadcast Indigo</span>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Copyright © 2026 Piotr Dębowski.</p>
+        <p><span data-i18n="footer_license">Aplikacja udostępniana na licencji open-source (GPL v3).</span></p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
