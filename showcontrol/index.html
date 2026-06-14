@@ -1,99 +1,407 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="pl" class="theme-indigo">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Show Control - Operator Console</title>
     <meta name="description" content="Professional application for managing multimedia projection during live events, shows, presentations, and concerts.">
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎛️</text></svg>">
 </head>
 <body>
+    <!-- Background Effects -->
     <div class="background-effects">
         <div class="glow-blob blob-1"></div>
         <div class="glow-blob blob-2"></div>
+        <div class="grid-overlay"></div>
     </div>
 
+    <!-- Navigation Bar -->
     <nav class="navbar glass">
-        <div class="logo">Show Control <span class="version">v0.3</span></div>
-        <div class="lang-switch">
-            <button id="btn-en" onclick="setLanguage('en')">EN</button>
-            <button id="btn-pl" onclick="setLanguage('pl')" class="active">PL</button>
+        <div class="logo" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+            <svg class="logo-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="23 7 16 12 23 17 23 7"/>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                <path d="M10 11l3-2v6l-3-2"/>
+            </svg>
+            <span>Show Control</span>
+            <span class="version">v0.3.5</span>
+        </div>
+        
+        <ul class="nav-links">
+            <li><a href="#features" data-i18n="nav_features">Funkcje</a></li>
+            <li><a href="#demo" data-i18n="nav_demo">Symulator</a></li>
+            <li><a href="#shortcuts" data-i18n="nav_shortcuts">Skróty</a></li>
+            <li><a href="#faq" data-i18n="nav_faq">FAQ</a></li>
+        </ul>
+
+        <div class="navbar-right">
+            <div class="lang-switch">
+                <button id="btn-pl" onclick="setLanguage('pl')" class="active">PL</button>
+                <button id="btn-en" onclick="setLanguage('en')">EN</button>
+            </div>
+            <a href="https://github.com/debowski/Show-control" class="github-link" target="_blank" rel="noopener" aria-label="GitHub Repository">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+                </svg>
+            </a>
         </div>
     </nav>
 
+    <!-- Main Content -->
     <main>
+        <!-- Hero Section -->
         <header class="hero">
             <div class="hero-content">
-                <div class="badge" data-i18n="hero_badge">Broadcast Edition</div>
-                <h1 data-i18n="hero_title">Profesjonalna kontrola nad Twoim wydarzeniem</h1>
-                <p data-i18n="hero_subtitle">Aplikacja do zarządzania projekcją multimediów (wideo, audio, grafika) podczas wydarzeń na żywo, pokazów, prezentacji i koncertów.</p>
+                <div class="badge">
+                    <span class="badge-dot"></span>
+                    <span data-i18n="hero_badge">Edycja Rekwizytornia • Wydanie Stabilne</span>
+                </div>
+                <h1 data-i18n="hero_title">Profesjonalna reżyseria multimediów na żywo</h1>
+                <p data-i18n="hero_subtitle">Stabilna konsola operatorska do natychmiastowej projekcji wideo, audio i grafik podczas koncertów, pokazów, prezentacji i eventów na drugim ekranie.</p>
                 <div class="cta-group">
                     <a href="https://github.com/debowski/Show-control/releases" class="cta-button primary" target="_blank" rel="noopener">
-                        <span class="icon">⬇️</span> <span data-i18n="download_btn">Pobierz Wersję .exe</span>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        <span data-i18n="download_btn">Pobierz Wersję .exe</span>
                     </a>
                     <a href="https://github.com/debowski/Show-control" class="cta-button secondary" target="_blank" rel="noopener">
-                        <span class="icon">⌨️</span> <span data-i18n="source_btn">Kod Źródłowy</span>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                            <polyline points="2 17 12 22 22 17"/>
+                            <polyline points="2 12 12 17 22 12"/>
+                        </svg>
+                        <span data-i18n="source_btn">Kod Źródłowy</span>
                     </a>
                 </div>
             </div>
-            <div class="hero-image glass-panel">
-                <img src="aplikacja_v03b.png" alt="Show Control Interface" id="app-preview">
+            <div class="hero-image-wrapper">
+                <div class="hero-image glass-panel">
+                    <img src="aplikacja_v03b.png" alt="Show Control Interface Preview" id="app-preview">
+                </div>
             </div>
         </header>
 
-        <section class="features">
-            <h2 class="section-title" data-i18n="features_title">Kluczowe Możliwości</h2>
+        <!-- Features Section -->
+        <section id="features" class="features">
+            <h2 class="section-title" data-i18n="features_title">Architektura Stabilności</h2>
+            <p class="section-subtitle" data-i18n="features_subtitle">Zaprojektowana celowo, aby unikać awarii, zawieszeń i opóźnień synchronizacji w krytycznych momentach eventów.</p>
+            
             <div class="features-grid">
                 <div class="feature-card glass-panel">
-                    <div class="icon">🖥️</div>
+                    <div class="feature-icon-box">🖥️</div>
                     <h3 data-i18n="feat_dual_title">Dwuekranowy Tryb Pracy</h3>
-                    <p data-i18n="feat_dual_desc">Operator steruje listą odtwarzania na jednym ekranie (konsola), podczas gdy obraz właściwy wyświetlany jest na drugim monitorze lub projektorze.</p>
+                    <p data-i18n="feat_dual_desc">Sterowanie listą odtwarzania odbywa się na monitorze operatora, podczas gdy bezramkowe wyjście projekcji blokuje się automatycznie na drugim ekranie (projektor, telewizor, ekran LED).</p>
                 </div>
+                
                 <div class="feature-card glass-panel">
-                    <div class="icon">🎬</div>
+                    <div class="feature-icon-box">🎬</div>
                     <h3 data-i18n="feat_vlc_title">Potężny Silnik LibVLC</h3>
-                    <p data-i18n="feat_vlc_desc">Bezproblemowe odtwarzanie wideo (MP4, MKV), audio (MP3, WAV) oraz grafik z wyjściem Direct3D11 i WaveOut dla najwyższej stabilności.</p>
+                    <p data-i18n="feat_vlc_desc">Brak problemów z kodekami. Płynne, akcelerowane sprzętowo odtwarzanie formatów MP4, MKV, MP3, WAV oraz grafik dzięki natywnemu renderowaniu Direct3D11.</p>
                 </div>
+                
                 <div class="feature-card glass-panel">
-                    <div class="icon">✨</div>
+                    <div class="feature-icon-box">✨</div>
                     <h3 data-i18n="feat_fade_title">Płynne Przejścia (Fade Out)</h3>
-                    <p data-i18n="feat_fade_desc">Zatrzymanie materiału z konfigurowalnym efektem Fade (0.2s - 2.0s) - ściemnienie obrazu i wyciszenie dźwięku bez drastycznych cięć.</p>
+                    <p data-i18n="feat_fade_desc">Zatrzymanie materiału z płynnym ściemnieniem obrazu i wyciszeniem dźwięku w wybranym czasie (0.2s - 2.0s), eliminujące nagłe cięcia dźwięku i czarne błyski.</p>
                 </div>
+                
                 <div class="feature-card glass-panel">
-                    <div class="icon">📋</div>
+                    <div class="feature-icon-box">📋</div>
                     <h3 data-i18n="feat_playlist_title">Zaawansowana Playlista</h3>
-                    <p data-i18n="feat_playlist_desc">Drag & drop, wyszukiwanie na żywo w trakcie odtwarzania, oznaczanie nakładek per-plik i pełne zapisywanie projektów do JSON.</p>
+                    <p data-i18n="feat_playlist_desc">Przeciąganie plików, wyszukiwanie na żywo, oznaczanie nakładek i pełny zapis projektów do elastycznego formatu JSON.</p>
                 </div>
+                
                 <div class="feature-card glass-panel">
-                    <div class="icon">🖼️</div>
-                    <h3 data-i18n="feat_overlay_title">System Nakładek (Logo)</h3>
-                    <p data-i18n="feat_overlay_desc">Niezależny odtwarzacz pozwala na wyświetlanie logo, grafik statycznych lub wideo w nieskończonej pętli bez dźwięku w tle głównej projekcji.</p>
+                    <div class="feature-icon-box">🖼️</div>
+                    <h3 data-i18n="feat_overlay_title">System Nakładek</h3>
+                    <p data-i18n="feat_overlay_desc">Niezależny odtwarzacz w tle umożliwiający ciągłą projekcję logo, banerów sponsorskich lub plansz standby bez zakłócania głównego toku odtwarzania.</p>
                 </div>
+                
                 <div class="feature-card glass-panel">
-                    <div class="icon">🛡️</div>
-                    <h3 data-i18n="feat_safety_title">Stabilność i Bezpieczeństwo</h3>
-                    <p data-i18n="feat_safety_desc">Mechanizmy self-healing, ochrona HWND okna projekcji przed przypadkowym zamknięciem i bezbłędna obsługa wyjątków w trakcie trwania eventu.</p>
+                    <div class="feature-icon-box">🛡️</div>
+                    <h3 data-i18n="feat_safety_title">Ochrona i Autonaprawa</h3>
+                    <p data-i18n="feat_safety_desc">Blokada przed przypadkowym zamknięciem okna wyjściowego, automatyczne przywracanie ostrości ekranu projekcji i bezbłędna obsługa błędów runtime.</p>
                 </div>
             </div>
         </section>
 
-        <section class="themes glass-panel">
-            <h2 data-i18n="themes_title">Cztery Motywy Interfejsu</h2>
-            <p data-i18n="themes_desc">Dopasuj aplikację do warunków oświetleniowych panujących w reżyserce.</p>
-            <div class="themes-list">
-                <span class="theme-badge" style="background: #1e1e1e; color: #007acc; border-color: #3c3c3c;">Studio Dark</span>
-                <span class="theme-badge" style="background: #f0f0f0; color: #0063b1; border-color: #b0b0b0;">Studio Light</span>
-                <span class="theme-badge" style="background: #0a0000; color: #cc0000; border-color: #3a0000;">Red Night (Stealth)</span>
-                <span class="theme-badge" style="background: #12131f; color: #6c63ff; border-color: #3a3a5c; box-shadow: 0 0 10px rgba(108, 99, 255, 0.4);">Broadcast Indigo</span>
+        <!-- Simulator Section -->
+        <section id="demo" class="simulator-section">
+            <h2 class="section-title" data-i18n="sim_title">Interaktywna Konsola w Przeglądarce</h2>
+            <p class="section-subtitle" data-i18n="sim_subtitle">Wypróbuj interfejs operatora i steruj projekcją na żywo za pomocą skrótów klawiszowych.</p>
+            
+            <div class="dual-screen-setup">
+                <!-- Monitor 1: Operator Console -->
+                <div class="monitor operator-monitor glass-panel">
+                    <div class="monitor-header">
+                        <div class="window-dots">
+                            <span class="dot red"></span>
+                            <span class="dot yellow"></span>
+                            <span class="dot green"></span>
+                        </div>
+                        <div class="monitor-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
+                                <rect x="9" y="9" width="6" height="6"/>
+                                <line x1="9" y1="1" x2="9" y2="4"/>
+                                <line x1="15" y1="1" x2="15" y2="4"/>
+                                <line x1="9" y1="20" x2="9" y2="23"/>
+                                <line x1="15" y1="20" x2="15" y2="23"/>
+                                <line x1="20" y1="9" x2="23" y2="9"/>
+                                <line x1="20" y1="15" x2="23" y2="15"/>
+                                <line x1="1" y1="9" x2="4" y2="9"/>
+                                <line x1="1" y1="15" x2="4" y2="15"/>
+                            </svg>
+                            <span>Show Control - Operator Console</span>
+                        </div>
+                        <div class="monitor-status-badge">DESKTOP</div>
+                    </div>
+                    <div class="monitor-body console-layout">
+                        <!-- Playlist Column -->
+                        <div class="console-col playlist-col">
+                            <div class="col-header" data-i18n="playlist_header">Playlista Projektu</div>
+                            <ul class="playlist-items" id="sim-playlist">
+                                <!-- Dynamic JS -->
+                            </ul>
+                        </div>
+                        
+                        <!-- Control Column -->
+                        <div class="console-col control-col">
+                            <div class="col-header" data-i18n="control_header">Sterownik Główny</div>
+                            
+                            <div class="active-media-info">
+                                <div class="label" data-i18n="active_media_label">Aktywny plik:</div>
+                                <div class="value" id="sim-active-title">---</div>
+                            </div>
+                            
+                            <div class="playback-status-row">
+                                <span class="status-indicator" id="sim-status-badge">IDLE</span>
+                                <span class="time-counter" id="sim-time-display">00:00 / 00:00</span>
+                            </div>
+                            
+                            <div class="progress-bar-wrapper">
+                                <div class="progress-bar-bg">
+                                    <div class="progress-bar-fill" id="sim-progress-fill"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="control-actions">
+                                <button class="sim-btn play" id="sim-btn-play" disabled>
+                                    <span class="icon">▶️</span> <span data-i18n="btn_play">PLAY</span>
+                                </button>
+                                <button class="sim-btn stop" id="sim-btn-stop" disabled>
+                                    <span class="icon">⏹️</span> <span data-i18n="btn_stop">STOP</span>
+                                </button>
+                            </div>
+                            
+                            <div class="fade-settings">
+                                <span class="label" data-i18n="fade_label">Efekt wygaszenia (Fade Out):</span>
+                                <div class="fade-presets">
+                                    <button class="fade-preset active" data-fade="0.5">0.5s</button>
+                                    <button class="fade-preset" data-fade="1.0">1.0s</button>
+                                    <button class="fade-preset" data-fade="2.0">2.0s</button>
+                                </div>
+                                <button class="sim-btn fade-out" id="sim-btn-fade" disabled>
+                                    <span class="icon">✨</span> <span data-i18n="btn_fade">WYGAŚ (FADE)</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Overlay Column -->
+                        <div class="console-col overlay-col">
+                            <div class="col-header" data-i18n="overlay_header">Warstwa Nakładki</div>
+                            <div class="overlay-toggle-card">
+                                <div class="toggle-row">
+                                    <span class="label" data-i18n="overlay_toggle_label">Logo w tle (Pętla):</span>
+                                    <label class="switch">
+                                        <input type="checkbox" id="sim-overlay-toggle">
+                                        <span class="slider round"></span>
+                                    </label>
+                                </div>
+                                <div class="overlay-details">
+                                    <span class="badge" id="sim-overlay-badge">OFF</span>
+                                    <span class="desc" data-i18n="overlay_desc_text">Niezależny kanał wideo/grafiki wyświetlany na pierwszym planie (brak dźwięku).</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Monitor 2: Projection Output -->
+                <div class="monitor projection-monitor glass-panel">
+                    <div class="monitor-header">
+                        <div class="monitor-title" data-i18n="projection_header">
+                            📺 Wyjście Projekcji (Ekran 2)
+                        </div>
+                        <div class="monitor-status-badge signal">LIVE SIGNAL</div>
+                    </div>
+                    <div class="monitor-body projection-screen-wrapper">
+                        <div class="projection-viewport" id="projection-screen">
+                            <canvas id="projection-canvas"></canvas>
+                            
+                            <!-- Overlay Watermark Layer -->
+                            <div class="projection-overlay" id="projection-watermark">
+                                <svg class="watermark-svg" viewBox="0 0 100 100">
+                                    <polygon points="50,15 90,80 10,80" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" style="stroke: var(--accent)"/>
+                                    <circle cx="50" cy="55" r="10" fill="currentColor" style="color: var(--accent)"/>
+                                </svg>
+                                <span class="watermark-text">SHOW CONTROL</span>
+                            </div>
+                            
+                            <!-- Screen Info Text -->
+                            <div class="screen-info-text" id="projection-info">NO SIGNAL</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Keyboard Shortcuts Section -->
+        <section id="shortcuts" class="shortcuts-section">
+            <h2 class="section-title" data-i18n="shortcuts_title">Skróty Klawiszowe Operatora</h2>
+            <p class="section-subtitle" data-i18n="shortcuts_subtitle">Profesjonalni operatorzy polegają na skrótach klawiszowych. Przetestuj je w symulatorze:</p>
+            
+            <div class="shortcuts-grid">
+                <div class="shortcut-card glass-panel" id="sc-space">
+                    <div class="shortcut-key-wrapper">
+                        <kbd>SPACE</kbd>
+                    </div>
+                    <h4 data-i18n="sc_space_title">Odtwórz / Pauza</h4>
+                    <p data-i18n="sc_space_desc">Uruchamia lub wstrzymuje odtwarzanie aktywnego pliku.</p>
+                </div>
+                
+                <div class="shortcut-card glass-panel" id="sc-esc">
+                    <div class="shortcut-key-wrapper">
+                        <kbd>ESC</kbd>
+                    </div>
+                    <h4 data-i18n="sc_esc_title">Zatrzymaj natychmiast</h4>
+                    <p data-i18n="sc_esc_desc">Natychmiast przerywa projekcję, zeruje czas i czyści ekran.</p>
+                </div>
+                
+                <div class="shortcut-card glass-panel" id="sc-f">
+                    <div class="shortcut-key-wrapper">
+                        <kbd>F</kbd>
+                    </div>
+                    <h4 data-i18n="sc_f_title">Płynne wygaszenie</h4>
+                    <p data-i18n="sc_f_desc">Ściemnia obraz i wycisza dźwięk w czasie wybranego efektu Fade.</p>
+                </div>
+                
+                <div class="shortcut-card glass-panel" id="sc-o">
+                    <div class="shortcut-key-wrapper">
+                        <kbd>O</kbd>
+                    </div>
+                    <h4 data-i18n="sc_o_title">Przełącz nakładkę</h4>
+                    <p data-i18n="sc_o_desc">Włącza lub wyłącza logo wyświetlane w rogu projekcji.</p>
+                </div>
+                
+                <div class="shortcut-card glass-panel" id="sc-arrows">
+                    <div class="shortcut-key-wrapper">
+                        <kbd>▲</kbd> / <kbd>▼</kbd>
+                    </div>
+                    <h4 data-i18n="sc_arrows_title">Nawigacja playlisty</h4>
+                    <p data-i18n="sc_arrows_desc">Zaznacza następny lub poprzedni plik na liście.</p>
+                </div>
+                
+                <div class="shortcut-card glass-panel" id="sc-enter">
+                    <div class="shortcut-key-wrapper">
+                        <kbd>ENTER</kbd>
+                    </div>
+                    <h4 data-i18n="sc_enter_title">Załaduj plik</h4>
+                    <p data-i18n="sc_enter_desc">Ładuje zaznaczony plik do głównego odtwarzacza.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Themes Section -->
+        <section id="themes" class="themes-section">
+            <h2 class="section-title" data-i18n="themes_title">Cztery Motywy Interfejsu</h2>
+            <p class="section-subtitle" data-i18n="themes_desc">Dopasuj aplikację i stronę do warunków oświetleniowych panujących w reżyserce.</p>
+            
+            <div class="themes-grid">
+                <div class="theme-card glass-panel active" data-theme="indigo">
+                    <div class="theme-color-circle" style="background: #12131f; border-color: #6c63ff;"></div>
+                    <h3 data-i18n="theme_indigo">Broadcast Indigo</h3>
+                    <span data-i18n="theme_indigo_desc">Domyślny motyw reżyserski</span>
+                </div>
+                
+                <div class="theme-card glass-panel" data-theme="dark">
+                    <div class="theme-color-circle" style="background: #121214; border-color: #007acc;"></div>
+                    <h3 data-i18n="theme_dark">Studio Dark</h3>
+                    <span data-i18n="theme_dark_desc">Wysoki kontrast</span>
+                </div>
+                
+                <div class="theme-card glass-panel" data-theme="red">
+                    <div class="theme-color-circle" style="background: #050000; border-color: #cc0000;"></div>
+                    <h3 data-i18n="theme_red">Red Night (Stealth)</h3>
+                    <span data-i18n="theme_red_desc">Tryb nocny chroniący wzrok</span>
+                </div>
+                
+                <div class="theme-card glass-panel" data-theme="light">
+                    <div class="theme-color-circle" style="background: #ffffff; border-color: #0063b1;"></div>
+                    <h3 data-i18n="theme_light">Studio Light</h3>
+                    <span data-i18n="theme_light_desc">Jasne pomieszczenia</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ Section -->
+        <section id="faq" class="faq-section">
+            <h2 class="section-title" data-i18n="faq_title">Najczęściej Zadawane Pytania</h2>
+            <p class="section-subtitle" data-i18n="faq_subtitle">Wszystko, co musisz wiedzieć o Show Control przed wydarzeniem.</p>
+            
+            <div class="faq-list">
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span data-i18n="faq_q1">Na czym polega dwuekranowość?</span>
+                        <span class="faq-icon">▼</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p data-i18n="faq_a1">Aplikacja automatycznie wykrywa podłączone monitory i projektory. Po uruchomieniu projekcji, okno bez obramowania otwiera się na drugim ekranie, podczas gdy panel sterowania pozostaje na pierwszym.</p>
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span data-i18n="faq_q2">Czym jest silnik LibVLC?</span>
+                        <span class="faq-icon">▼</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p data-i18n="faq_a2">To ten sam silnik, który zasila znany odtwarzacz VLC Media Player. Dzięki temu Show Control odtwarza praktycznie każdy format pliku wideo i audio stabilnie, bez instalacji dodatkowych kodeków.</p>
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span data-i18n="faq_q3">Jak działa mechanizm self-healing?</span>
+                        <span class="faq-icon">▼</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p data-i18n="faq_a3">Show Control stale monitoruje stan okna projekcyjnego. W razie przypadkowego zminimalizowania, utraty ostrości lub zamknięcia przez system, aplikacja natychmiast przywraca okno projekcji do właściwego stanu i pozycji.</p>
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span data-i18n="faq_q4">Czy aplikacja wymaga instalacji?</span>
+                        <span class="faq-icon">▼</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p data-i18n="faq_a4">Nie, aplikacja jest w pełni przenośna (portable) i uruchamia się z jednego pliku .exe, co ułatwia pracę na różnych komputerach w reżyserce.</p>
+                    </div>
+                </div>
             </div>
         </section>
     </main>
 
+    <!-- Footer -->
     <footer>
-        <p>Copyright © 2026 Piotr Dębowski.</p>
-        <p><span data-i18n="footer_license">Aplikacja udostępniana na licencji open-source (GPL v3).</span></p>
+        <p data-i18n="footer_license">Aplikacja Show Control udostępniana jest bezpłatnie na licencji open-source (GPL v3).</p>
+        <p data-i18n="footer_author">Copyright © 2026 Piotr Dębowski.</p>
     </footer>
 
     <script src="script.js"></script>
