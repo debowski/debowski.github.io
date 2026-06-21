@@ -19,7 +19,9 @@
     <nav class="fixed w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
         <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
             <span class="text-xl font-bold tracking-tighter text-slate-900 underline decoration-blue-500">Piotr Dębowski</span>
-            <div class="space-x-6 text-sm font-medium">
+
+            <!-- Desktop links -->
+            <div class="hidden md:flex space-x-6 text-sm font-medium">
                 <a href="#o-mnie" class="hover:text-blue-600 transition">O mnie</a>
                 <a href="#specjalizacje" class="hover:text-blue-600 transition">Specjalizacje</a>
                 <a href="#doswiadczenie" class="hover:text-blue-600 transition">Doświadczenie</a>
@@ -29,6 +31,36 @@
                 <a href="showcontrol/index.html" class="hover:text-blue-600 transition">Show Control</a>
                 <a href="index2.html" class="hover:text-blue-600 transition">Zasoby</a>
                 <a href="#kontakt" class="bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">Kontakt</a>
+            </div>
+
+            <!-- Mobile hamburger -->
+            <button id="menu-toggle" class="md:hidden inline-flex items-center justify-center p-2 rounded-md text-slate-800" aria-label="Otwórz menu" aria-expanded="false">
+                <!-- simple hamburger icon -->
+                <svg id="menu-open-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                <svg id="menu-close-icon" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <!-- Mobile menu (dropdown panel under nav) -->
+        <div id="mobile-menu" aria-hidden="true" class="md:hidden bg-white text-slate-900 shadow-md" style="display:none;overflow:hidden;padding:8px 0;">
+            <div class="max-w-5xl mx-auto px-4 py-2">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-lg font-bold">Piotr Dębowski</span>
+                    <button id="mobile-close" aria-label="Zamknij menu" class="p-2 text-slate-800 rounded-md">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                <nav class="flex flex-col space-y-2 text-base font-medium">
+                    <a href="#o-mnie" class="block py-3 px-4 rounded-md hover:bg-slate-50">O mnie</a>
+                    <a href="#specjalizacje" class="block py-3 px-4 rounded-md hover:bg-slate-50">Specjalizacje</a>
+                    <a href="#doswiadczenie" class="block py-3 px-4 rounded-md hover:bg-slate-50">Doświadczenie</a>
+                    <a href="tools.html" class="block py-3 px-4 rounded-md hover:bg-slate-50">Narzędzia</a>
+                    <a href="time.html" class="block py-3 px-4 rounded-md hover:bg-slate-50">Zegar</a>
+                    <a href="flipjpg.html" class="block py-3 px-4 rounded-md hover:bg-slate-50">FlipJPG</a>
+                    <a href="showcontrol/index.html" class="block py-3 px-4 rounded-md hover:bg-slate-50">Show Control</a>
+                    <a href="index2.html" class="block py-3 px-4 rounded-md hover:bg-slate-50">Zasoby</a>
+                    <a href="#kontakt" class="block py-3 px-4 rounded-md bg-slate-900 text-white text-center">Kontakt</a>
+                </nav>
             </div>
         </div>
     </nav>
@@ -253,6 +285,82 @@
                 });
             });
         });
+    </script>
+    <script>
+        // Mobile menu toggle
+        (function(){
+            const toggle = document.getElementById('menu-toggle')
+            const mobile = document.getElementById('mobile-menu')
+            const closeBtn = document.getElementById('mobile-close')
+            const openIcon = document.getElementById('menu-open-icon')
+            const closeIcon = document.getElementById('menu-close-icon')
+            if(!toggle || !mobile) return
+
+            // Move menu node to body and use fixed positioning + translateY for slide-down
+            const panelInner = mobile; // element to animate
+            const navEl = document.querySelector('nav')
+            // helper to position panel below nav
+            function positionPanel(){
+                const navHeight = navEl ? Math.ceil(navEl.getBoundingClientRect().height) : 0
+                panelInner.style.position = 'fixed'
+                panelInner.style.left = '0'
+                panelInner.style.right = '0'
+                panelInner.style.top = navHeight + 'px'
+                panelInner.style.zIndex = 9999
+                panelInner.style.transition = 'transform 280ms ease'
+                panelInner.style.transform = 'translateY(-100%)'
+            }
+            // move node to body so it's not clipped by parent containers
+            try{ document.body.appendChild(panelInner) }catch(e){}
+            positionPanel()
+            window.addEventListener('resize', positionPanel)
+
+            function openMenu(){
+                panelInner.style.display = 'block'
+                // allow repaint
+                requestAnimationFrame(()=>{
+                    panelInner.style.transform = 'translateY(0)'
+                })
+                panelInner.setAttribute('aria-hidden','false')
+                toggle.setAttribute('aria-expanded','true')
+                if(openIcon) openIcon.classList.add('hidden')
+                if(closeIcon) closeIcon.classList.remove('hidden')
+            }
+
+            function closeMenu(){
+                panelInner.style.transform = 'translateY(-100%)'
+                panelInner.setAttribute('aria-hidden','true')
+                toggle.setAttribute('aria-expanded','false')
+                if(openIcon) openIcon.classList.remove('hidden')
+                if(closeIcon) closeIcon.classList.add('hidden')
+                setTimeout(()=>{ panelInner.style.display = 'none' }, 300)
+            }
+
+            toggle.addEventListener('click', ()=>{
+                const isOpen = toggle.getAttribute('aria-expanded') === 'true'
+                if(isOpen) closeMenu(); else openMenu();
+            })
+            closeBtn && closeBtn.addEventListener('click', closeMenu)
+
+            // close when clicking outside the panel (listen on document to cover fixed positioning)
+            document.addEventListener('click', (e)=>{
+                const target = e.target
+                if(!panelInner.contains(target) && !toggle.contains(target) && toggle.getAttribute('aria-expanded') === 'true'){
+                    closeMenu()
+                }
+            })
+
+            // close when clicking any link inside mobile menu
+            mobile.querySelectorAll('a').forEach(a=>{
+                a.addEventListener('click', ()=>{
+                    // small timeout to allow navigation / smooth scroll
+                    setTimeout(closeMenu, 50)
+                })
+            })
+
+            // close on Esc
+            document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeMenu() })
+        })()
     </script>
 </body>
 </html>
