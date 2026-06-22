@@ -44,12 +44,6 @@
         <!-- Mobile menu (dropdown panel under nav) -->
         <div id="mobile-menu" aria-hidden="true" class="md:hidden bg-white text-slate-900 shadow-md" style="display:none;overflow:hidden;padding:8px 0;">
             <div class="max-w-5xl mx-auto px-4 py-2">
-                <div class="flex items-center justify-between mb-4">
-                    <span class="text-lg font-bold">Piotr Dębowski</span>
-                    <button id="mobile-close" aria-label="Zamknij menu" class="p-2 text-slate-800 rounded-md">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
-                </div>
                 <nav class="flex flex-col space-y-2 text-base font-medium">
                     <a href="#o-mnie" class="block py-3 px-4 rounded-md hover:bg-slate-50">O mnie</a>
                     <a href="#specjalizacje" class="block py-3 px-4 rounded-md hover:bg-slate-50">Specjalizacje</a>
@@ -291,7 +285,8 @@
         (function(){
             const toggle = document.getElementById('menu-toggle')
             const mobile = document.getElementById('mobile-menu')
-            const closeBtn = document.getElementById('mobile-close')
+            // mobile close button was removed; rely on toggle and outside clicks
+            const closeBtn = null
             const openIcon = document.getElementById('menu-open-icon')
             const closeIcon = document.getElementById('menu-close-icon')
             if(!toggle || !mobile) return
@@ -340,7 +335,7 @@
                 const isOpen = toggle.getAttribute('aria-expanded') === 'true'
                 if(isOpen) closeMenu(); else openMenu();
             })
-            closeBtn && closeBtn.addEventListener('click', closeMenu)
+            // closeBtn removed
 
             // close when clicking outside the panel (listen on document to cover fixed positioning)
             document.addEventListener('click', (e)=>{
