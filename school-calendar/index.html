@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kalendarz roku szkolnego 2026/2027</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1 id="title">Kalendarz roku szkolnego 2026/2027</h1>
+      <div class="controls">
+        <label for="startYear">Rok początku:</label>
+        <input id="startYear" type="number" min="1900" max="2100" value="2026" style="width:90px" />
+        <span style="margin-right:8px">Miesiąc początku: <strong>Wrzesień</strong></span>
+        <button id="prev">← Poprzedni</button>
+        <select id="monthSelect"></select>
+        <button id="next">Następny →</button>
+        <button id="showAll">Pokaż cały rok</button>
+        <button id="gotoToday">Dzisiaj</button>
+      </div>
+    </header>
+
+    <main id="calendarRoot"></main>
+
+    <aside class="sidebar">
+      <h3>Legenda</h3>
+      <ul>
+        <li><span class="dot school-day"></span> Dzień nauki</li>
+        <li><span class="dot weekend"></span> Weekend</li>
+        <li><span class="dot holiday"></span> Święto</li>
+        <li><span class="dot event"></span> Zdarzenie</li>
+        <li><span class="dot outside"></span> Poza rokiem szkolnym</li>
+      </ul>
+      <div class="actions">
+        <button id="export">Eksportuj JSON</button>
+        <button id="import">Importuj JSON</button>
+        <button id="clear">Wyczyść zdarzenia</button>
+        <button id="print">Drukuj</button>
+      </div>
+    </aside>
+
+    <div id="eventModal" class="modal hidden">
+      <div class="modal-content">
+        <h2 id="modalDate"></h2>
+        <textarea id="eventText" placeholder="Notatka / zdarzenie"></textarea>
+        <div class="modal-actions">
+          <button id="saveEvent">Zapisz</button>
+          <button id="deleteEvent">Usuń</button>
+          <button id="closeModal">Zamknij</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
