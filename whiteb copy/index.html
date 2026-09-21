@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Whiteboard – Biała Tablica</title>
+<meta name="description" content="Prosta biała tablica online – rysowanie, zmazywanie, zapis. Działa na tablicach interaktywnych i tabletach graficznych.">
+<meta name="theme-color" content="#ffffff">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='white' stroke='black' stroke-width='6'/><path d='M20 70 Q50 20 80 70' stroke='black' stroke-width='8' fill='none' stroke-linecap='round'/></svg>">
+</head>
+<body>
+<div id="app">
+  <!-- TOOLBAR -->
+  <header class="toolbar" id="toolbar">
+    <div class="toolbar__left">
+      <a href="../" class="toolbar__logo" title="Wróć na stronę główną">
+        <i class="fa-solid fa-chalkboard"></i>
+        <span>Whiteboard</span>
+      </a>
+      <div class="toolbar__divider"></div>
+      <div class="tool-group" role="toolbar" aria-label="Narzędzia">
+        <button class="tool-btn active" id="btn-pen" data-tool="pen" title="Pisak (P)" aria-label="Pisak">
+          <i class="fa-solid fa-pen"></i>
+        </button>
+        <button class="tool-btn" id="btn-eraser" data-tool="eraser" title="Gumka (E) / odwróć rysik">
+          <i class="fa-solid fa-eraser"></i>
+        </button>
+        <button class="tool-btn" id="btn-select" data-tool="select" title="Zaznacz i przesuń (V)">
+          <i class="fa-solid fa-expand"></i>
+        </button>
+        <button class="tool-btn" id="btn-pointer" data-tool="pointer" title="Wskaźnik – nie rysuje, do przewijania (Spacja+przeciągnij też przesuwa)">
+          <i class="fa-solid fa-arrow-pointer"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="toolbar__center">
+      <div class="palette" id="palette">
+        <button class="color-btn active" data-color="#0f0f0f" style="--c:#0f0f0f" title="Czarny" aria-label="Czarny"></button>
+        <button class="color-btn" data-color="#ef2626" style="--c:#ef2626" title="Czerwony"></button>
+        <button class="color-btn" data-color="#2563eb" style="--c:#2563eb" title="Niebieski"></button>
+        <button class="color-btn" data-color="#16a34a" style="--c:#16a34a" title="Zielony"></button>
+        <button class="color-btn" data-color="#eab308" style="--c:#eab308" title="Żółty"></button>
+        <button class="color-btn" data-color="#9333ea" style="--c:#9333ea" title="Fioletowy"></button>
+        <label class="color-picker" title="Wybierz dowolny kolor">
+          <input type="color" id="color-input" value="#0f0f0f">
+          <i class="fa-solid fa-eye-dropper"></i>
+        </label>
+      </div>
+
+      <div class="size-group">
+        <i class="fa-solid fa-circle" style="font-size:10px; opacity:.5"></i>
+        <input type="range" id="size-range" min="1" max="48" value="4" title="Grubość linii">
+        <i class="fa-solid fa-circle" style="font-size:18px; opacity:.8"></i>
+        <span id="size-label" class="size-label">4 px</span>
+      </div>
+
+      <label class="pressure-toggle" title="Tablet graficzny: grubość zależna od nacisku">
+        <input type="checkbox" id="pressure-toggle" checked>
+        <span><i class="fa-solid fa-pen-nib"></i> nacisk</span>
+      </label>
+    </div>
+
+    <div class="toolbar__right">
+      <div class="tool-group">
+        <button class="tool-btn" id="btn-undo" title="Cofnij (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
+        <button class="tool-btn" id="btn-redo" title="Ponów (Ctrl+Shift+Z)"><i class="fa-solid fa-rotate-right"></i></button>
+      </div>
+      <div class="toolbar__divider"></div>
+      <div class="zoom-group" id="zoom-group">
+        <button class="tool-btn" id="zoom-out" title="Pomniejsz (Ctrl −)"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+        <span id="zoom-label" class="zoom-label">100%</span>
+        <button class="tool-btn" id="zoom-in" title="Powiększ (Ctrl +)"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+        <button class="tool-btn" id="zoom-reset" title="Reset widoku (Ctrl 0)"><i class="fa-solid fa-expand"></i></button>
+      </div>
+      <div class="toolbar__divider hide-mobile"></div>
+      <select id="bg-select" class="bg-select" title="Tło">
+        <option value="white">Białe</option>
+        <option value="grid">Kratka</option>
+        <option value="lines">Linie</option>
+        <option value="dots">Kropki</option>
+      </select>
+      <button class="btn btn--ghost" id="btn-clear" title="Wyczyść tablicę (Del)">
+        <i class="fa-solid fa-trash-can"></i> <span class="hide-mobile">Wyczyść</span>
+      </button>
+      <button class="btn btn--ghost" id="btn-save" title="Zapisz jako PNG">
+        <i class="fa-solid fa-download"></i> <span class="hide-mobile">Zapisz</span>
+      </button>
+      <div class="tool-group">
+        <button class="btn btn--ghost" id="btn-export-svg" title="Eksportuj SVG (wektor)"><i class="fa-solid fa-file-code"></i> <span class="hide-mobile">SVG</span></button>
+        <button class="btn btn--ghost" id="btn-import-svg" title="Importuj SVG"><i class="fa-solid fa-file-arrow-up"></i> <span class="hide-mobile">Import</span></button>
+        <input type="file" id="import-svg-input" accept=".svg,image/svg+xml" hidden>
+        <button class="btn btn--ghost" id="btn-import-image" title="Wklej/wgraj obraz (Ctrl+V, drag&drop)"><i class="fa-solid fa-image"></i> <span class="hide-mobile">Obraz</span></button>
+        <input type="file" id="import-image-input" accept="image/*" hidden>
+      </div>
+      <button class="btn btn--primary" id="btn-fullscreen" title="Pełny ekran (F)">
+        <i class="fa-solid fa-expand"></i>
+      </button>
+    </div>
+
+    <button id="toolbar-toggle" class="toolbar__toggle" aria-label="Zwiń pasek"><i class="fa-solid fa-chevron-up"></i></button>
+  </header>
+
+  <!-- CANVAS WRAP -->
+  <div class="canvas-wrap" id="canvas-wrap">
+    <canvas id="board" aria-label="Biała tablica do rysowania"></canvas>
+    <div id="selection-box" class="selection-box" aria-hidden="true">
+      <div class="selection-box__handle" data-handle="move"></div>
+    </div>
+    <canvas id="selection-ghost" class="selection-ghost" aria-hidden="true"></canvas>
+    <div id="cursor" class="cursor"></div>
+    <div class="hint" id="hint">Rysuj palcem / myszą / piórkiem. Spacja+przeciągnij = przesuwanie. Odwróć rysik = gumka.</div>
+  </div>
+
+  <!-- MOBILE BAR -->
+  <div class="mobile-tools">
+    <button class="tool-btn active" data-tool="pen"><i class="fa-solid fa-pen"></i></button>
+    <button class="tool-btn" data-tool="eraser"><i class="fa-solid fa-eraser"></i></button>
+    <button class="tool-btn" data-tool="select"><i class="fa-solid fa-expand"></i></button>
+    <button class="tool-btn" id="m-undo"><i class="fa-solid fa-rotate-left"></i></button>
+    <button class="btn btn--danger" id="m-clear"><i class="fa-solid fa-trash-can"></i></button>
+    <button class="btn btn--primary" id="m-save"><i class="fa-solid fa-download"></i></button>
+  </div>
+</div>
+
+<!-- Clear modal -->
+<dialog id="clear-dialog">
+  <p>Czy na pewno wyczyścić całą tablicę?</p>
+  <form method="dialog" class="dialog-actions">
+    <button value="cancel" class="btn btn--ghost">Anuluj</button>
+    <button value="confirm" class="btn btn--danger">Wyczyść</button>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>
