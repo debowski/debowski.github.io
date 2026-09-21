@@ -1,7 +1,7 @@
 (() => {
   const canvas = document.getElementById('board');
   const wrap = document.getElementById('canvas-wrap');
-  const ctx = canvas.getContext('2d', { desynchronized: true });
+  const ctx = canvas.getContext('2d');
   const hint = document.getElementById('hint');
   const toolbar = document.getElementById('toolbar');
 
@@ -63,20 +63,7 @@
   const undoStack = [];
   const redoStack = [];
 
-  function dpr(){ return Math.max(1, Math.min(1.5, window.devicePixelRatio||1)); }
-  // rAF batching – redukuje opóźnienie i jank na tablicach USB (1 redraw na klatkę)
-  let rafId=null, needsRedraw=false;
-  function requestRedraw(){
-    needsRedraw=true;
-    if(rafId) return;
-    rafId=requestAnimationFrame(()=>{
-      rafId=null;
-      if(!needsRedraw) return;
-      needsRedraw=false;
-      redraw();
-    });
-  }
-  function flushRedraw(){ if(rafId){ cancelAnimationFrame(rafId); rafId=null; } if(needsRedraw){ needsRedraw=false; redraw(); } }
+  function dpr(){ return Math.max(1, window.devicePixelRatio||1); }
 
   function applyBackground(){
     wrap.classList.remove('bg-white','bg-grid','bg-lines','bg-dots');
@@ -290,31 +277,9 @@
     }
     return out;
   }
-  // lżejsza wersja dla live-preview (1 przebieg) – mniej CPU w trakcie rysowania na USB
-  function smoothPointsLive(points){
-    if(!points || points.length < 3) return points;
-    const filtered=[points[0]];
-    for(let i=1;i<points.length;i++){
-      const dx=points[i].x-filtered[filtered.length-1].x, dy=points[i].y-filtered[filtered.length-1].y;
-      if(Math.hypot(dx,dy) >= 0.6) filtered.push(points[i]);
-    }
-    if(filtered.length < 3) return filtered;
-    const out=[filtered[0]];
-    for(let i=1;i<filtered.length-1;i++){
-      const p=filtered[i-1], c=filtered[i], n=filtered[i+1];
-      out.push({
-        x: p.x*0.20 + c.x*0.60 + n.x*0.20,
-        y: p.y*0.20 + c.y*0.60 + n.y*0.20,
-        pressure: p.pressure*0.20 + c.pressure*0.60 + n.pressure*0.20
-      });
-    }
-    out.push(filtered[filtered.length-1]);
-    return out;
-  }
   function drawStroke(st){
     if(!st.points || st.points.length===0) return;
-    const isLive = isDrawing && st===currentStroke;
-    const pts = isLive ? smoothPointsLive(st.points) : smoothPoints(st.points);
+    const pts = smoothPoints(st.points);
     if(pts.length===1){
       const p = pts[0];
       const w = st.usePressure ? widthForPressure(p.pressure, st.baseWidth) : st.baseWidth;
@@ -324,7 +289,7 @@
     }
     const rawW = pts.map(p=> st.usePressure ? widthForPressure(p.pressure, st.baseWidth) : st.baseWidth);
     const widths = rawW.slice();
-    if(!isLive && widths.length>=3){
+    if(widths.length>=3){
       const tmp=widths.slice();
       for(let i=1;i<widths.length-1;i++) widths[i]=tmp[i-1]*0.25 + tmp[i]*0.50 + tmp[i+1]*0.25;
       widths[0]=tmp[0]*0.60 + tmp[1]*0.40;
@@ -336,7 +301,7 @@
       const a=pts[i-1], b=pts[i];
       const wa=widths[i-1], wb=widths[i];
       const dist=Math.hypot(b.x-a.x, b.y-a.y);
-      const steps=isLive ? Math.max(1, Math.min(3, Math.ceil(dist/8))) : Math.max(1, Math.min(6, Math.ceil(dist/4)));
+      const steps=Math.max(1, Math.min(6, Math.ceil(dist/4)));
       if(i===1){
         for(let s=0;s<steps;s++){
           const t0=s/steps, t1=(s+1)/steps;
@@ -366,7 +331,7 @@
         }
         if(i===pts.length-1){
           const d2=Math.hypot(b.x-mx1,b.y-my1);
-          const steps2=isLive ? Math.max(1, Math.ceil(d2/8)) : Math.max(1, Math.ceil(d2/4));
+          const steps2=Math.max(1, Math.ceil(d2/4));
           for(let s2=0;s2<steps2;s2++){
             const t0=s2/steps2, t1=(s2+1)/steps2;
             const x0=mx1+(b.x-mx1)*t0, y0=my1+(b.y-my1)*t0;
@@ -621,7 +586,7 @@
         im.x = orig.x + dx;
         im.y = orig.y + dy;
       });
-      requestRedraw();
+      redraw();
       updateSelectionUI();
       e.preventDefault(); return true;
     }
@@ -671,7 +636,7 @@
     const cur={x:e.clientX-rect.left, y:e.clientY-rect.top};
     panX = panOrig.x + (cur.x - panStart.x);
     panY = panOrig.y + (cur.y - panStart.y);
-    requestRedraw(); updateSelectionUI();
+    redraw(); updateSelectionUI();
   }
   function endPan(e){
     if(!isPanning) return;
@@ -704,7 +669,7 @@
       const screenR= baseWidth*3.2+6, worldR=screenR/scale;
       const before=strokes.length;
       strokes = strokes.filter(s=> !isStrokeHitByEraser(s, x,y,x,y, worldR/2));
-      if(strokes.length!==before) requestRedraw();
+      if(strokes.length!==before) redraw();
       canvas.dataset.effectiveTool='eraser';
       return;
     }
@@ -722,56 +687,34 @@
     canvas.dataset.effectiveTool='pen';
   });
 
-  function handlePointerMove(e){
-    const isCoalesced = e.getCoalescedEvents && e.getCoalescedEvents().length>0;
-    const evts = isCoalesced ? e.getCoalescedEvents() : [e];
-    const lastE = evts[evts.length-1];
-    cursor.style.left=lastE.clientX+'px'; cursor.style.top=lastE.clientY+'px';
-    // aktualizuj ostatnią pozycję world dla wklejania obrazów
-    try{ const lp=getPos(lastE); lastMouseWorld={x:lp.x, y:lp.y}; }catch(_){}
-    if(isPanning){ doPan(lastE); return; }
-    if(tool==='select'){ handleSelectPointerMove(lastE); return; }
+  canvas.addEventListener('pointermove', (e)=>{
+    const {x,y,pressure}=getPos(e);
+    lastMouseWorld={x,y};
+    cursor.style.left=e.clientX+'px'; cursor.style.top=e.clientY+'px';
+    if(isPanning){ doPan(e); return; }
+    if(tool==='select'){ handleSelectPointerMove(e); return; }
     if(!isDrawing || e.pointerId!==activePointerId) return;
     e.preventDefault();
     const eff=canvas.dataset.effectiveTool||tool;
     if(eff==='eraser'){
       const screenR= baseWidth*3.2+6, worldR=screenR/scale;
-      let changed=false;
-      for(const ce of evts){
-        const {x,y}=getPos(ce);
-        lastMouseWorld={x,y};
-        const x0=eraserLast?eraserLast.x:x, y0=eraserLast?eraserLast.y:y;
-        const before=strokes.length;
-        strokes = strokes.filter(s=> !isStrokeHitByEraser(s, x0,y0,x,y, worldR/2));
-        if(strokes.length!==before) changed=true;
-        eraserLast={x,y}; lastX=x; lastY=y;
-      }
-      if(changed) requestRedraw();
+      const x0=eraserLast?eraserLast.x:x, y0=eraserLast?eraserLast.y:y;
+      const before=strokes.length;
+      strokes = strokes.filter(s=> !isStrokeHitByEraser(s, x0,y0,x,y, worldR/2));
+      eraserLast={x,y};
+      if(strokes.length!==before) redraw();
+      lastX=x; lastY=y;
       return;
     }
-    // pen – dopisz punkty z coalesced events, lekki jitter filter
-    let appended=false;
-    for(const ce of evts){
-      const {x,y,pressure}=getPos(ce);
-      lastMouseWorld={x,y};
-      if(currentStroke){
-        const last = currentStroke.points[currentStroke.points.length-1];
-        if(last && Math.hypot(last.x - x, last.y - y) < 0.5) continue;
-        currentStroke.points.push({x,y,pressure});
-        lastX=x; lastY=y; appended=true;
-      }
+    // pen – dopisz punkt i odśwież z lekkim wygładzeniem
+    if(currentStroke){
+      const last = currentStroke.points[currentStroke.points.length-1];
+      if(last && Math.hypot(last.x - x, last.y - y) < 0.6) return; // ignoruj mikro-jitter
+      currentStroke.points.push({x,y,pressure});
+      redraw(); // żywy podgląd wygładzonej linii
+      lastX=x; lastY=y;
     }
-    if(appended) requestRedraw();
-  }
-  canvas.addEventListener('pointermove', handlePointerMove);
-  // pointerrawupdate – najniższe opóźnienie na tablicach USB/pen (Chrome/Edge)
-  if('onpointerrawupdate' in window){
-    canvas.addEventListener('pointerrawupdate', (e)=>{
-      if(!isDrawing || isPanning) return;
-      if(tool==='select') return;
-      handlePointerMove(e);
-    });
-  }
+  });
 
   function endDraw(e){
     if(isPanning){ endPan(e); return; }
@@ -781,7 +724,7 @@
     isDrawing=false; activePointerId=null;
     currentStroke=null; eraserLast=null;
     ctx.globalCompositeOperation='source-over';
-    flushRedraw(); // pełne wygładzenie na końcu
+    redraw(); // upewnij się że ostatni segment jest spójny
   }
   canvas.addEventListener('pointerup', endDraw);
   canvas.addEventListener('pointercancel', (e)=>{
