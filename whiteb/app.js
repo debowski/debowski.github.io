@@ -30,6 +30,7 @@
   const MIN_SCALE = 0.25, MAX_SCALE = 4;
   let isPanning = false, panStart = null, panOrig = null;
   let pinchStartDist = null, pinchStartScale = 1;
+  let isSpacePressed = false;
 
   // wektorowe strokes: {id, color, baseWidth, usePressure, points:[{x,y,pressure}]}
   let strokes = [];
@@ -38,10 +39,16 @@
   let lastX = 0, lastY = 0;
   let eraserLast = null; // {x,y} do ciągłego wymazywania
 
+  // obrazy: {id, src, x,y,w,h, _img}
+  let images = [];
+  let lastMouseWorld = null;
+
   // Select / move – wektorowo
   let selection = null; // {x,y,w,h} CSS px
   let selectedIndices = []; // indeksy w strokes
   let selectedOriginals = []; // kopie punktów do przesuwania
+  let selectedImageIndices = []; // indeksy w images
+  let selectedImageOriginals = []; // kopie pozycji obrazów
   let isSelecting = false;
   let isDraggingSel = false;
   let selStart = null;
@@ -148,9 +155,28 @@
 
   // --- Historia wektorowa ---
   function cloneStrokes(arr){ return JSON.parse(JSON.stringify(arr)); }
+  function getHistorySnapshot(){
+    return {
+      strokes: cloneStrokes(strokes),
+      images: images.map(im=> ({id:im.id, src:im.src, x:im.x, y:im.y, w:im.w, h:im.h}))
+    };
+  }
+  function restoreSnapshot(snap){
+    strokes = cloneStrokes(snap.strokes||[]);
+    const restored = (snap.images||[]).map(d=>{
+      const im={id:d.id, src:d.src, x:d.x, y:d.y, w:d.w, h:d.h, _img:null};
+      const img=new Image();
+      img.src=d.src;
+      img.onload=()=> redraw();
+      im._img=img;
+      return im;
+    });
+    images=restored;
+    redraw();
+  }
   function pushHistory(){
     try{
-      undoStack.push(cloneStrokes(strokes));
+      undoStack.push(getHistorySnapshot());
       if(undoStack.length>MAX_HISTORY) undoStack.shift();
       redoStack.length=0;
       updateUndoRedo();
@@ -163,19 +189,17 @@
   function undo(){
     if(!undoStack.length) return;
     clearSelection(false);
-    redoStack.push(cloneStrokes(strokes));
+    redoStack.push(getHistorySnapshot());
     const prev = undoStack.pop();
-    strokes = prev;
-    redraw();
+    restoreSnapshot(prev);
     updateUndoRedo();
   }
   function redo(){
     if(!redoStack.length) return;
     clearSelection(false);
-    undoStack.push(cloneStrokes(strokes));
+    undoStack.push(getHistorySnapshot());
     const nxt = redoStack.pop();
-    strokes = nxt;
-    redraw();
+    restoreSnapshot(nxt);
     updateUndoRedo();
   }
   function updateUndoRedo(){
@@ -187,6 +211,7 @@
   function clearCanvas(push=true){
     if(push) pushHistory();
     strokes = [];
+    images = [];
     clearSelection(false);
     redraw();
     applyBackground();
@@ -195,30 +220,61 @@
   // --- Rysowanie wektorów ---
   function widthForPressure(pressure, base){
     if(!usePressure) return base;
-    const p = pressure && pressure!==0.5 ? pressure : 0.7;
-    const factor = 0.35 + p*1.25;
+    let p = pressure;
+    if(p==null || p===0.5) p=0.7;
+    p=Math.max(0, Math.min(1, p));
+    const factor = 0.45 + p*0.95;
     return Math.max(1, base * factor);
   }
-  // lekkie wygładzanie – średnia ważona 3 pkt (20/60/20), zachowuje końce
+  // zwiększone wygładzanie – dwuprzebiegowe, końce wtapiane (likwiduje schodki)
   function smoothPoints(points){
     if(!points || points.length < 3) return points;
-    // filtruj duplikaty bardzo bliskich punktów (jitter)
     const filtered=[points[0]];
     for(let i=1;i<points.length;i++){
       const dx=points[i].x-filtered[filtered.length-1].x, dy=points[i].y-filtered[filtered.length-1].y;
-      if(Math.hypot(dx,dy) >= 0.7) filtered.push(points[i]);
+      if(Math.hypot(dx,dy) >= 0.6) filtered.push(points[i]);
     }
     if(filtered.length < 3) return filtered;
-    const out=[filtered[0]];
-    for(let i=1;i<filtered.length-1;i++){
-      const p=filtered[i-1], c=filtered[i], n=filtered[i+1];
-      out.push({
-        x: p.x*0.20 + c.x*0.60 + n.x*0.20,
-        y: p.y*0.20 + c.y*0.60 + n.y*0.20,
-        pressure: p.pressure*0.20 + c.pressure*0.60 + n.pressure*0.20
-      });
+    const n=filtered.length;
+    const pass1=new Array(n);
+    pass1[0]={...filtered[0]};
+    pass1[n-1]={...filtered[n-1]};
+    for(let i=1;i<n-1;i++){
+      const p=filtered[i-1], c=filtered[i], nn=filtered[i+1];
+      pass1[i]={
+        x: p.x*0.20 + c.x*0.60 + nn.x*0.20,
+        y: p.y*0.20 + c.y*0.60 + nn.y*0.20,
+        pressure: p.pressure*0.20 + c.pressure*0.60 + nn.pressure*0.20
+      };
     }
-    out.push(filtered[filtered.length-1]);
+    const out=new Array(n);
+    out[0]={
+      x: pass1[0].x*0.65 + pass1[1].x*0.30 + pass1[2].x*0.05,
+      y: pass1[0].y*0.65 + pass1[1].y*0.30 + pass1[2].y*0.05,
+      pressure: pass1[0].pressure*0.55 + pass1[1].pressure*0.35 + pass1[2].pressure*0.10
+    };
+    out[n-1]={
+      x: pass1[n-1].x*0.65 + pass1[n-2].x*0.30 + pass1[n-3].x*0.05,
+      y: pass1[n-1].y*0.65 + pass1[n-2].y*0.30 + pass1[n-3].y*0.05,
+      pressure: pass1[n-1].pressure*0.55 + pass1[n-2].pressure*0.35 + pass1[n-3].pressure*0.10
+    };
+    for(let i=1;i<n-1;i++){
+      if(i>=2 && i<=n-3){
+        const p2=pass1[i-2], p1=pass1[i-1], c=pass1[i], n1=pass1[i+1], n2=pass1[i+2];
+        out[i]={
+          x: p2.x*0.08 + p1.x*0.22 + c.x*0.40 + n1.x*0.22 + n2.x*0.08,
+          y: p2.y*0.08 + p1.y*0.22 + c.y*0.40 + n1.y*0.22 + n2.y*0.08,
+          pressure: p2.pressure*0.10 + p1.pressure*0.25 + c.pressure*0.30 + n1.pressure*0.25 + n2.pressure*0.10
+        };
+      } else {
+        const p=pass1[i-1], c=pass1[i], nn=pass1[i+1];
+        out[i]={
+          x: p.x*0.25 + c.x*0.50 + nn.x*0.25,
+          y: p.y*0.25 + c.y*0.50 + nn.y*0.25,
+          pressure: p.pressure*0.30 + c.pressure*0.40 + nn.pressure*0.30
+        };
+      }
+    }
     return out;
   }
   function drawStroke(st){
@@ -231,26 +287,62 @@
       ctx.beginPath(); ctx.arc(p.x, p.y, w/2, 0, Math.PI*2); ctx.fill();
       return;
     }
+    const rawW = pts.map(p=> st.usePressure ? widthForPressure(p.pressure, st.baseWidth) : st.baseWidth);
+    const widths = rawW.slice();
+    if(widths.length>=3){
+      const tmp=widths.slice();
+      for(let i=1;i<widths.length-1;i++) widths[i]=tmp[i-1]*0.25 + tmp[i]*0.50 + tmp[i+1]*0.25;
+      widths[0]=tmp[0]*0.60 + tmp[1]*0.40;
+      widths[widths.length-1]=tmp[widths.length-1]*0.60 + tmp[widths.length-2]*0.40;
+    }
     ctx.strokeStyle = st.color;
     ctx.lineCap='round'; ctx.lineJoin='round';
-    // segmentowe rysowanie wygładzonej polilinii – zachowuje zmienną grubość per-segment
     for(let i=1;i<pts.length;i++){
-      const a = pts[i-1], b = pts[i];
-      const w = st.usePressure ? (widthForPressure(a.pressure, st.baseWidth)+widthForPressure(b.pressure, st.baseWidth))/2 : st.baseWidth;
-      ctx.lineWidth = w;
-      ctx.beginPath();
+      const a=pts[i-1], b=pts[i];
+      const wa=widths[i-1], wb=widths[i];
+      const dist=Math.hypot(b.x-a.x, b.y-a.y);
+      const steps=Math.max(1, Math.min(6, Math.ceil(dist/4)));
       if(i===1){
-        ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+        for(let s=0;s<steps;s++){
+          const t0=s/steps, t1=(s+1)/steps;
+          const x0=a.x+(b.x-a.x)*t0, y0=a.y+(b.y-a.y)*t0;
+          const x1=a.x+(b.x-a.x)*t1, y1=a.y+(b.y-a.y)*t1;
+          const w=(wa+(wb-wa)*t0 + wa+(wb-wa)*t1)/2;
+          ctx.lineWidth=w;
+          ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+        }
       } else {
-        // wygładzony segment: poprzedni punkt jako kontrolny, środek jako cel
-        const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
-        ctx.moveTo((pts[i-2].x + a.x)/2, (pts[i-2].y + a.y)/2);
-        ctx.quadraticCurveTo(a.x, a.y, mx, my);
-        if(i===pts.length-1){ // domknij ostatni odcinek
-          ctx.lineTo(b.x, b.y);
+        const p0=pts[i-2];
+        const mx0=(p0.x+a.x)/2, my0=(p0.y+a.y)/2;
+        const mx1=(a.x+b.x)/2, my1=(a.y+b.y)/2;
+        const wStart=(widths[i-2]+wa)/2, wMid=wa, wEnd=(wa+wb)/2;
+        for(let s=0;s<steps;s++){
+          const t0=s/steps, t1=(s+1)/steps;
+          const qx0=(1-t0)*(1-t0)*mx0 + 2*(1-t0)*t0*a.x + t0*t0*mx1;
+          const qy0=(1-t0)*(1-t0)*my0 + 2*(1-t0)*t0*a.y + t0*t0*my1;
+          const qx1=(1-t1)*(1-t1)*mx0 + 2*(1-t1)*t1*a.x + t1*t1*mx1;
+          const qy1=(1-t1)*(1-t1)*my0 + 2*(1-t1)*t1*a.y + t1*t1*my1;
+          let w0,w1;
+          if(t0<0.5){ const tt=t0*2; w0=wStart+(wMid-wStart)*tt; } else { const tt=(t0-0.5)*2; w0=wMid+(wEnd-wMid)*tt; }
+          if(t1<0.5){ const tt=t1*2; w1=wStart+(wMid-wStart)*tt; } else { const tt=(t1-0.5)*2; w1=wMid+(wEnd-wMid)*tt; }
+          const w=(w0+w1)/2;
+          ctx.lineWidth=w;
+          ctx.beginPath(); ctx.moveTo(qx0,qy0); ctx.lineTo(qx1,qy1); ctx.stroke();
+        }
+        if(i===pts.length-1){
+          const d2=Math.hypot(b.x-mx1,b.y-my1);
+          const steps2=Math.max(1, Math.ceil(d2/4));
+          for(let s2=0;s2<steps2;s2++){
+            const t0=s2/steps2, t1=(s2+1)/steps2;
+            const x0=mx1+(b.x-mx1)*t0, y0=my1+(b.y-my1)*t0;
+            const x1=mx1+(b.x-mx1)*t1, y1=my1+(b.y-my1)*t1;
+            const w0=wEnd+(wb-wEnd)*t0, w1=wEnd+(wb-wEnd)*t1;
+            const w=(w0+w1)/2;
+            ctx.lineWidth=w;
+            ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+          }
         }
       }
-      ctx.stroke();
     }
   }
   function redraw(){
@@ -259,10 +351,22 @@
     ctx.setTransform(1,0,0,1,0,0);
     ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.setTransform(scale*ratio,0,0,scale*ratio, panX*ratio, panY*ratio);
+    // obrazy na spodzie, wektory na wierzchu -> można adnotować obrazek
+    for(const im of images){
+      if(im._img && im._img.complete && im._img.naturalWidth){
+        try{ ctx.drawImage(im._img, im.x, im.y, im.w, im.h); }catch(e){}
+      } else if(im._img){
+        // placeholder ramka dopóki się ładuje
+        ctx.save();
+        ctx.fillStyle='#e2e8f0';
+        ctx.fillRect(im.x, im.y, im.w, im.h);
+        ctx.restore();
+      }
+    }
     // rysuj wszystkie wektory w przestrzeni world
     for(const s of strokes) drawStroke(s);
     // podświetl zaznaczone (po wierzchu, przerywane)
-    if(tool==='select' && selectedIndices.length){
+    if(tool==='select' && (selectedIndices.length || selectedImageIndices.length)){
       ctx.save();
       ctx.strokeStyle='rgba(37,99,235,0.95)';
       ctx.lineWidth=1.2; ctx.setLineDash([6,4]);
@@ -272,6 +376,11 @@
         const bb = getStrokeBBox(s);
         if(!bb) continue;
         ctx.strokeRect(bb.x-3, bb.y-3, bb.w+6, bb.h+6);
+      }
+      for(const idx of selectedImageIndices){
+        const im = images[idx];
+        if(!im) continue;
+        ctx.strokeRect(im.x-3, im.y-3, im.w+6, im.h+6);
       }
       ctx.restore();
     }
@@ -285,6 +394,11 @@
     for(const p of s.points){ if(p.x<minX)minX=p.x; if(p.y<minY)minY=p.y; if(p.x>maxX)maxX=p.x; if(p.y>maxY)maxY=p.y; }
     const pad = (s.baseWidth||4)/2 + 2;
     return {x:minX-pad, y:minY-pad, w:(maxX-minX)+pad*2, h:(maxY-minY)+pad*2, minX,minY,maxX,maxY};
+  }
+  function isImageInRect(im, rect){
+    if(!im) return false;
+    if(im.x + im.w < rect.x || im.x > rect.x+rect.w || im.y + im.h < rect.y || im.y > rect.y+rect.h) return false;
+    return true;
   }
   function distPointToSegment(px,py, x1,y1,x2,y2){
     const l2=(x2-x1)*(x2-x1)+(y2-y1)*(y2-y1);
@@ -371,10 +485,10 @@
     updateCursor();
     updateSelectionUI();
     if(t==='select'){
-      hint.textContent='Zaznacz prostokątem i przeciągnij, aby przesunąć wektory. Delete = usuń, Esc = anuluj.';
+      hint.textContent='Zaznacz prostokątem i przeciągnij, aby przesunąć wektory/obrazy. Delete = usuń, Esc = anuluj. Spacja = przesuwanie.';
       hint.classList.remove('hide');
     } else {
-      hint.textContent='Rysuj palcem / myszą / piórkiem. Odwróć rysik = gumka. Tryb zaznaczenia (V) do przesuwania wektorów.';
+      hint.textContent='Rysuj palcem / myszą / piórkiem. Spacja+przeciągnij = przesuwanie. Odwróć rysik = gumka. V = zaznacz.';
     }
   }
   function updateCursor(){
@@ -406,7 +520,7 @@
   }
   function clearSelection(push=false){
     // push niepotrzebny w wektorach – historia już obsłużona przy drag
-    selection=null; selectedIndices=[]; selectedOriginals=[]; isSelecting=false; isDraggingSel=false; selStart=null; dragStart=null; dragOffset=null; selPos=null;
+    selection=null; selectedIndices=[]; selectedOriginals=[]; selectedImageIndices=[]; selectedImageOriginals=[]; isSelecting=false; isDraggingSel=false; selStart=null; dragStart=null; dragOffset=null; selPos=null;
     selectionBox.classList.remove('active','moving'); selectionBox.style.display='none';
     selectionGhost.style.display='none';
     canvas.classList.remove('select--move');
@@ -417,20 +531,24 @@
     strokes.forEach((s,i)=>{ if(isStrokeInRect(s,rect)) idx.push(i); });
     return idx;
   }
-
-  function getPos(e){ const r=canvas.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top, pressure:e.pressure??0.5, pointerType:e.pointerType}; }
+  function findImageIndicesInRect(rect){
+    const idx=[];
+    images.forEach((im,i)=>{ if(isImageInRect(im,rect)) idx.push(i); });
+    return idx;
+  }
 
   // Pointer events
   let activePointerId=null;
 
   function handleSelectPointerDown(e){
     const {x,y}=getPos(e);
-    if(selection && hitSelection(x,y) && !isSelecting && selectedIndices.length){
+    if(selection && hitSelection(x,y) && !isSelecting && (selectedIndices.length || selectedImageIndices.length)){
       isDraggingSel=true; dragStart={x,y};
       // zapamiętaj pozycję ramki i oryginalne punkty
       selPos={x:selection.x, y:selection.y};
       dragOffset={x:x-selection.x, y:y-selection.y};
       selectedOriginals = selectedIndices.map(i=> cloneStrokes([strokes[i]])[0].points.map(p=>({...p})));
+      selectedImageOriginals = selectedImageIndices.map(i=> ({x:images[i].x, y:images[i].y, w:images[i].w, h:images[i].h}));
       pushHistory();
       canvas.setPointerCapture(e.pointerId); activePointerId=e.pointerId;
       canvas.classList.add('select--move'); updateSelectionUI();
@@ -461,6 +579,13 @@
         const st=strokes[idx];
         st.points = orig.map(p=>({x:p.x+dx, y:p.y+dy, pressure:p.pressure}));
       });
+      // przesuń obrazy
+      selectedImageIndices.forEach((idx,k)=>{
+        const orig=selectedImageOriginals[k];
+        const im=images[idx];
+        im.x = orig.x + dx;
+        im.y = orig.y + dy;
+      });
       redraw();
       updateSelectionUI();
       e.preventDefault(); return true;
@@ -471,12 +596,13 @@
   function handleSelectPointerUp(e){
     if(isSelecting){
       isSelecting=false;
-      if(!selection || selection.w<8 || selection.h<8){
+      if(!selection || selection.w*scale<8 || selection.h*scale<8){
         clearSelection(false);
       } else {
         selectedIndices=findIndicesInRect(selection);
+        selectedImageIndices=findImageIndicesInRect(selection);
         // jeśli nic nie trafiono – zostaw pustą ramkę do ponownego zaznaczenia? wyczyść
-        if(!selectedIndices.length){
+        if(!selectedIndices.length && !selectedImageIndices.length){
           // zostaw ramkę ale bez podświetlenia – użytkownik widzi że nic nie ma
         }
         updateSelectionUI(); redraw();
@@ -488,7 +614,7 @@
       isDraggingSel=false;
       // zatwierdź: zaktualizuj selection na nową pozycję
       if(selPos) selection={x:selPos.x, y:selPos.y, w:selection.w, h:selection.h};
-      selPos=null; selectedOriginals=[]; dragStart=null;
+      selPos=null; selectedOriginals=[]; selectedImageOriginals=[]; dragStart=null;
       canvas.classList.remove('select--move');
       updateSelectionUI(); redraw();
       if(activePointerId!==null) try{canvas.releasePointerCapture(activePointerId);}catch(_){}
@@ -518,12 +644,12 @@
     isPanning=false; panStart=null; panOrig=null;
     if(activePointerId!==null) try{canvas.releasePointerCapture(activePointerId);}catch(_){}
     activePointerId=null;
-    canvas.style.cursor='';
+    canvas.style.cursor= isSpacePressed ? 'grab' : '';
   }
 
   canvas.addEventListener('pointerdown', (e)=>{
-    // pan – narzędzie pointer lub środkowy przycisk / spacja
-    if(tool==='pointer' || e.button===1 || (e.button===0 && e.altKey)){
+    // pan – narzędzie pointer / środkowy przycisk / Alt / Spacja
+    if(tool==='pointer' || e.button===1 || (e.button===0 && e.altKey) || isSpacePressed){
       startPan(e); e.preventDefault(); return;
     }
     if(tool==='select'){ handleSelectPointerDown(e); return; }
@@ -563,6 +689,7 @@
 
   canvas.addEventListener('pointermove', (e)=>{
     const {x,y,pressure}=getPos(e);
+    lastMouseWorld={x,y};
     cursor.style.left=e.clientX+'px'; cursor.style.top=e.clientY+'px';
     if(isPanning){ doPan(e); return; }
     if(tool==='select'){ handleSelectPointerMove(e); return; }
@@ -607,8 +734,11 @@
         // cofnij przesunięcie
         if(selectedIndices.length && selectedOriginals.length){
           selectedIndices.forEach((idx,k)=>{ strokes[idx].points = selectedOriginals[k].map(p=>({...p})); });
-          redraw();
         }
+        if(selectedImageIndices.length && selectedImageOriginals.length){
+          selectedImageIndices.forEach((idx,k)=>{ const o=selectedImageOriginals[k]; images[idx].x=o.x; images[idx].y=o.y; });
+        }
+        redraw();
         clearSelection(false); activePointerId=null; return;
       }
     }
@@ -616,8 +746,6 @@
   });
   canvas.addEventListener('pointerleave', ()=>{ cursor.style.display='none'; });
   canvas.addEventListener('pointerenter', (e)=>{ updateCursor(); cursor.style.left=e.clientX+'px'; cursor.style.top=e.clientY+'px'; });
-
-  function widthForPressure(pressure, base){ if(!usePressure) return base; const p=pressure&&pressure!==0.5?pressure:0.7; const f=0.35+p*1.25; return Math.max(1, base*f); }
 
   document.querySelectorAll('.tool-btn[data-tool]').forEach(b=> b.addEventListener('click', ()=> setTool(b.dataset.tool)));
   document.querySelectorAll('.mobile-tools .tool-btn[data-tool]').forEach(b=> b.addEventListener('click', ()=> setTool(b.dataset.tool)));
@@ -694,12 +822,96 @@
     if(!ok) alert('Nie udało się wczytać SVG – nie znaleziono wektorów.');
     e.target.value='';
   });
+  document.getElementById('btn-import-image')?.addEventListener('click', ()=> document.getElementById('import-image-input')?.click());
+  document.getElementById('import-image-input')?.addEventListener('change', e=>{
+    const file=e.target.files?.[0]; if(!file) return;
+    addImageFromFile(file);
+    e.target.value='';
+  });
   // drag & drop SVG na tablicę
-  wrap.addEventListener('dragover', e=>{ if(e.dataTransfer?.types.includes('image/svg+xml') || e.dataTransfer?.types.includes('text/plain')){ e.preventDefault(); wrap.style.outline='2px dashed var(--primary)'; }});
+  // --- Obrazy: wklejanie / drag&drop ---
+  function addImageFromSrc(src, worldPos){
+    const img=new Image();
+    img.src=src;
+    img.onload=()=>{
+      let iw=img.naturalWidth, ih=img.naturalHeight;
+      if(!iw||!ih) return;
+      const rect=wrap.getBoundingClientRect();
+      const viewW=rect.width/scale, viewH=rect.height/scale;
+      const maxW=viewW*0.6, maxH=viewH*0.6;
+      let fit=Math.min(1, maxW/iw, maxH/ih);
+      if(iw*fit>1000) fit=1000/iw;
+      if(ih*fit>1000) fit=Math.min(fit,1000/ih);
+      const worldW=iw*fit, worldH=ih*fit;
+      let cx, cy;
+      if(worldPos){ cx=worldPos.x - worldW/2; cy=worldPos.y - worldH/2; }
+      else {
+        // schowek / przycisk Obraz -> zawsze na dole viewportu, wyśrodkowany poziomo
+        const bottomCenter = screenToWorld(rect.width/2, rect.height);
+        const pad = 24 / scale;
+        cx = bottomCenter.x - worldW/2;
+        cy = bottomCenter.y - worldH - pad;
+      }
+      pushHistory();
+      const rec={id:Date.now()+Math.random(), src, x:cx, y:cy, w:worldW, h:worldH, _img:img};
+      images.push(rec);
+      // auto-select w trybie select
+      selection={x:cx, y:cy, w:worldW, h:worldH};
+      selectedIndices=[];
+      selectedImageIndices=[images.length-1];
+      selectedOriginals=[]; selectedImageOriginals=[];
+      setTool('select');
+      updateSelectionUI(); redraw();
+      hint.textContent='Obraz wklejony – zaznacz (V) i przeciągnij aby przesunąć, Delete aby usunąć. Ctrl+V aby wkleić kolejny.';
+      hint.classList.remove('hide');
+      setTimeout(()=> hint.classList.add('hide'), 4000);
+    };
+    img.onerror=()=> console.warn('image load failed');
+  }
+  function addImageFromFile(file, worldPos){
+    if(!file.type.startsWith('image/')) return false;
+    const reader=new FileReader();
+    reader.onload=e=> addImageFromSrc(e.target.result, worldPos);
+    reader.readAsDataURL(file);
+    return true;
+  }
+  // Ctrl+V – wklejanie ze schowka
+  document.addEventListener('paste', e=>{
+    const ae=document.activeElement;
+    if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.isContentEditable)) return;
+    const items=e.clipboardData?.items;
+    if(!items) return;
+    let handled=false;
+    for(const it of items){
+      if(it.type.startsWith('image/')){
+        const file=it.getAsFile();
+        if(file){ addImageFromFile(file); handled=true; }
+      }
+    }
+    // fallback: files
+    if(!handled && e.clipboardData.files && e.clipboardData.files.length){
+      for(const f of e.clipboardData.files){
+        if(f.type.startsWith('image/')){ addImageFromFile(f); handled=true; }
+      }
+    }
+    if(handled) e.preventDefault();
+  });
+  // drag & drop obrazów + SVG
+  wrap.addEventListener('dragover', e=>{
+    const hasImage=[... (e.dataTransfer.types||[])].some(t=> t.includes('image')) || [...(e.dataTransfer.files||[])].some(f=> f.type.startsWith('image/'));
+    const hasSvg=e.dataTransfer?.types.includes('image/svg+xml') || e.dataTransfer?.types.includes('text/plain');
+    if(hasImage || hasSvg){ e.preventDefault(); wrap.style.outline='2px dashed var(--primary)'; }
+  });
   wrap.addEventListener('dragleave', ()=>{ wrap.style.outline=''; });
   wrap.addEventListener('drop', async e=>{
-    const file=[...e.dataTransfer.files].find(f=> f.type==='image/svg+xml' || f.name.endsWith('.svg'));
-    if(file){ e.preventDefault(); wrap.style.outline=''; const text=await file.text(); importSVGText(text); return; }
+    const rect=wrap.getBoundingClientRect();
+    const worldPos=screenToWorld(e.clientX-rect.left, e.clientY-rect.top);
+    // obraz?
+    const imgFile=[...e.dataTransfer.files].find(f=> f.type.startsWith('image/'));
+    if(imgFile){ e.preventDefault(); wrap.style.outline=''; addImageFromFile(imgFile, worldPos); return; }
+    // svg plik?
+    const svgFile=[...e.dataTransfer.files].find(f=> f.type==='image/svg+xml' || f.name.endsWith('.svg'));
+    if(svgFile){ e.preventDefault(); wrap.style.outline=''; const text=await svgFile.text(); importSVGText(text); return; }
     const svgText=e.dataTransfer.getData('text/plain');
     if(svgText && svgText.includes('<svg')){ e.preventDefault(); importSVGText(svgText); }
     wrap.style.outline='';
@@ -896,26 +1108,52 @@
     else if(e.key==='p'||e.key==='P'){ setTool('pen'); }
     else if(e.key==='v'||e.key==='V'){ setTool('select'); }
     else if(e.key==='h'||e.key==='H'){ setTool('pointer'); }
+    else if(e.code==='Space' || e.key===' '){
+      const ae=document.activeElement;
+      if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.isContentEditable)) return;
+      if(!isSpacePressed){
+        isSpacePressed=true;
+        if(!isPanning) canvas.style.cursor='grab';
+        cursor.style.display='none';
+      }
+      e.preventDefault();
+    }
     else if(e.key==='Escape'){
       if(tool==='select' && (selection||isDraggingSel)){
         e.preventDefault();
         // cofnij drag jeśli był
-        if(isDraggingSel && selectedIndices.length && selectedOriginals.length){
-          selectedIndices.forEach((idx,k)=>{ strokes[idx].points = selectedOriginals[k].map(p=>({...p})); });
+        if(isDraggingSel){
+          if(selectedIndices.length && selectedOriginals.length){
+            selectedIndices.forEach((idx,k)=>{ strokes[idx].points = selectedOriginals[k].map(p=>({...p})); });
+          }
+          if(selectedImageIndices.length && selectedImageOriginals.length){
+            selectedImageIndices.forEach((idx,k)=>{ const o=selectedImageOriginals[k]; images[idx].x=o.x; images[idx].y=o.y; });
+          }
           redraw();
         }
         clearSelection(false);
       }
     }
     else if(e.key==='Delete'||e.key==='Backspace'){
-      if(tool==='select' && selection && selectedIndices.length){
+      if(tool==='select' && selection && (selectedIndices.length || selectedImageIndices.length)){
         e.preventDefault(); pushHistory();
         // usuń zaznaczone wektory – od końca by indeksy się nie rozjechały
         selectedIndices.sort((a,b)=>b-a).forEach(i=> strokes.splice(i,1));
+        selectedImageIndices.sort((a,b)=>b-a).forEach(i=> images.splice(i,1));
         clearSelection(false); redraw();
       } else if(e.key==='Delete') { if(confirm('Wyczyścić tablicę?')) clearCanvas(true); }
     }
     else if(e.key==='F'||e.key==='f'){ if(document.activeElement===document.body){ e.preventDefault(); btnFullscreen.click(); } }
+  });
+  document.addEventListener('keyup', e=>{
+    if(e.code==='Space' || e.key===' '){
+      isSpacePressed=false;
+      if(!isPanning) canvas.style.cursor='';
+      updateCursor();
+    }
+  });
+  window.addEventListener('blur', ()=>{
+    if(isSpacePressed){ isSpacePressed=false; if(!isPanning) canvas.style.cursor=''; updateCursor(); }
   });
 
   canvas.addEventListener('contextmenu', e=> e.preventDefault());
