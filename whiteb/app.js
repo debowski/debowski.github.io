@@ -38,6 +38,9 @@
   let isDrawing = false;
   let lastX = 0, lastY = 0;
   let eraserLast = null; // {x,y} do ciągłego wymazywania
+  // wielodotyk – mapa pointerId -> stroke / eraser
+  const activeStrokes = new Map();
+  const eraserLastMap = new Map();
 
   // obrazy: {id, src, x,y,w,h, _img}
   let images = [];
@@ -648,43 +651,52 @@
   }
 
   canvas.addEventListener('pointerdown', (e)=>{
-    // pan – narzędzie pointer / środkowy przycisk / Alt / Spacja
+    // pan – narzędzie pointer / środkowy przycisk / Alt / Spacja (blokuj gdy już rysujemy wielodotykiem)
     if(tool==='pointer' || e.button===1 || (e.button===0 && e.altKey) || isSpacePressed){
+      if(activeStrokes.size>0 || eraserLastMap.size>0) return;
       startPan(e); e.preventDefault(); return;
     }
     if(tool==='select'){ handleSelectPointerDown(e); return; }
     if(e.button!==0 && e.button!==5) return;
+    if(e.pointerType==='touch' && pinchStartDist) return;
     let effectiveTool=tool;
     if(e.pointerType==='pen' && e.button===5) effectiveTool='eraser';
     if(e.pointerType==='pen' && e.buttons===32) effectiveTool='eraser';
     e.preventDefault();
-    canvas.setPointerCapture(e.pointerId); activePointerId=e.pointerId;
+    canvas.setPointerCapture(e.pointerId);
     const {x,y,pressure}=getPos(e);
-    isDrawing=true; lastX=x; lastY=y;
     hint.classList.add('hide');
+    if(!canvas._activeTools) canvas._activeTools=new Map();
 
     if(effectiveTool==='eraser'){
-      pushHistory();
-      eraserLast={x,y};
+      const isFirst = activeStrokes.size===0 && eraserLastMap.size===0;
+      if(isFirst) pushHistory();
+      eraserLastMap.set(e.pointerId, {x,y});
+      canvas._activeTools.set(e.pointerId, 'eraser');
+      isDrawing=true; eraserLast={x,y}; lastX=x; lastY=y;
+      try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+      activePointerId=e.pointerId;
       const screenR= baseWidth*3.2+6, worldR=screenR/scale;
       const before=strokes.length;
       strokes = strokes.filter(s=> !isStrokeHitByEraser(s, x,y,x,y, worldR/2));
       if(strokes.length!==before) redraw();
-      canvas.dataset.effectiveTool='eraser';
       return;
     }
-    // pen – nowy wektor
-    pushHistory();
-    currentStroke={id: Date.now()+Math.random(), color, baseWidth, usePressure, points:[{x,y,pressure}]};
-    strokes.push(currentStroke);
-    // narysuj kropkę (z uwzględnieniem skali)
+    // pen – nowy wektor per pointerId (wielodotyk)
+    const isFirstPen = activeStrokes.size===0 && eraserLastMap.size===0;
+    if(isFirstPen) pushHistory();
+    const newStroke={id: Date.now()+Math.random(), color, baseWidth, usePressure, points:[{x,y,pressure}], pointerId:e.pointerId};
+    strokes.push(newStroke);
+    activeStrokes.set(e.pointerId, newStroke);
+    currentStroke=newStroke; isDrawing=true; lastX=x; lastY=y;
+    canvas._activeTools.set(e.pointerId, 'pen');
+    try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+    activePointerId=e.pointerId;
     const w=widthForPressure(pressure, baseWidth);
     ctx.save(); ctx.setTransform(scale*dpr(),0,0,scale*dpr(), panX*dpr(), panY*dpr());
     ctx.fillStyle=color;
     ctx.beginPath(); ctx.arc(x,y,w/2,0,Math.PI*2); ctx.fill();
     ctx.restore();
-    // pełny redraw zapewni spójność wygładzania
-    canvas.dataset.effectiveTool='pen';
   });
 
   canvas.addEventListener('pointermove', (e)=>{
@@ -693,9 +705,34 @@
     cursor.style.left=e.clientX+'px'; cursor.style.top=e.clientY+'px';
     if(isPanning){ doPan(e); return; }
     if(tool==='select'){ handleSelectPointerMove(e); return; }
-    if(!isDrawing || e.pointerId!==activePointerId) return;
+    // wielodotyk – obsługa per pointerId
+    const effMap = canvas._activeTools ? canvas._activeTools.get(e.pointerId) : null;
+    const eff = effMap || canvas.dataset.effectiveTool || tool;
+    if(eff==='eraser' && eraserLastMap.has(e.pointerId)){
+      e.preventDefault();
+      const screenR= baseWidth*3.2+6, worldR=screenR/scale;
+      const last = eraserLastMap.get(e.pointerId);
+      const x0=last?last.x:x, y0=last?last.y:y;
+      const before=strokes.length;
+      strokes = strokes.filter(s=> !isStrokeHitByEraser(s, x0,y0,x,y, worldR/2));
+      eraserLastMap.set(e.pointerId, {x,y});
+      eraserLast={x,y}; lastX=x; lastY=y;
+      if(strokes.length!==before) redraw();
+      return;
+    }
+    if(activeStrokes.has(e.pointerId)){
+      e.preventDefault();
+      const st = activeStrokes.get(e.pointerId);
+      const last = st.points[st.points.length-1];
+      if(last && Math.hypot(last.x - x, last.y - y) < 0.6) return;
+      st.points.push({x,y,pressure});
+      currentStroke=st; lastX=x; lastY=y;
+      redraw();
+      return;
+    }
+    // fallback single-pointer (kompatybilność)
+    if(!isDrawing || (activePointerId!==null && e.pointerId!==activePointerId)) return;
     e.preventDefault();
-    const eff=canvas.dataset.effectiveTool||tool;
     if(eff==='eraser'){
       const screenR= baseWidth*3.2+6, worldR=screenR/scale;
       const x0=eraserLast?eraserLast.x:x, y0=eraserLast?eraserLast.y:y;
@@ -706,32 +743,66 @@
       lastX=x; lastY=y;
       return;
     }
-    // pen – dopisz punkt i odśwież z lekkim wygładzeniem
     if(currentStroke){
       const last = currentStroke.points[currentStroke.points.length-1];
-      if(last && Math.hypot(last.x - x, last.y - y) < 0.6) return; // ignoruj mikro-jitter
+      if(last && Math.hypot(last.x - x, last.y - y) < 0.6) return;
       currentStroke.points.push({x,y,pressure});
-      redraw(); // żywy podgląd wygładzonej linii
+      redraw();
       lastX=x; lastY=y;
     }
   });
 
   function endDraw(e){
-    if(isPanning){ endPan(e); return; }
+    if(isPanning){
+      if(e && activePointerId!==null && e.pointerId!==activePointerId) return;
+      endPan(e); return;
+    }
     if(tool==='select'){ if(e) handleSelectPointerUp(e); return; }
-    if(!isDrawing) return;
-    if(e && activePointerId!==null && e.pointerId!==activePointerId) return;
-    isDrawing=false; activePointerId=null;
-    currentStroke=null; eraserLast=null;
+    if(e && e.pointerId!=null){
+      let had=false;
+      if(activeStrokes.has(e.pointerId)){
+        activeStrokes.delete(e.pointerId);
+        had=true;
+      }
+      if(eraserLastMap.has(e.pointerId)){
+        eraserLastMap.delete(e.pointerId);
+        had=true;
+      }
+      if(canvas._activeTools) canvas._activeTools.delete(e.pointerId);
+      try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+      if(had){
+        const remaining=[...activeStrokes.values()];
+        currentStroke = remaining.length ? remaining[remaining.length-1] : null;
+        if(activeStrokes.size>0 || eraserLastMap.size>0){
+          isDrawing=true;
+          activePointerId = remaining.length ? [...activeStrokes.keys()].pop() : ([...eraserLastMap.keys()].pop() || null);
+          redraw();
+          return;
+        }
+        isDrawing=false; activePointerId=null; currentStroke=null; eraserLast=null;
+        ctx.globalCompositeOperation='source-over';
+        redraw();
+        return;
+      }
+      // fallback single-pointer
+      if(!isDrawing) return;
+      if(activePointerId!==null && e.pointerId!==activePointerId) return;
+      isDrawing=false; activePointerId=null; currentStroke=null; eraserLast=null;
+      ctx.globalCompositeOperation='source-over';
+      redraw();
+      return;
+    }
+    activeStrokes.clear(); eraserLastMap.clear();
+    if(canvas._activeTools) canvas._activeTools.clear();
+    isDrawing=false; activePointerId=null; currentStroke=null; eraserLast=null;
     ctx.globalCompositeOperation='source-over';
-    redraw(); // upewnij się że ostatni segment jest spójny
+    redraw();
   }
   canvas.addEventListener('pointerup', endDraw);
   canvas.addEventListener('pointercancel', (e)=>{
     if(tool==='select'){
       if(isSelecting){ clearSelection(false); activePointerId=null; return; }
       if(isDraggingSel){
-        // cofnij przesunięcie
         if(selectedIndices.length && selectedOriginals.length){
           selectedIndices.forEach((idx,k)=>{ strokes[idx].points = selectedOriginals[k].map(p=>({...p})); });
         }
@@ -741,6 +812,29 @@
         redraw();
         clearSelection(false); activePointerId=null; return;
       }
+    }
+    // przy cancel usuń niekompletne strokes wielodotyku
+    if(e && e.pointerId!=null && activeStrokes.has(e.pointerId)){
+      const st=activeStrokes.get(e.pointerId);
+      const idx=strokes.indexOf(st);
+      if(idx!==-1) strokes.splice(idx,1);
+      activeStrokes.delete(e.pointerId);
+      if(canvas._activeTools) canvas._activeTools.delete(e.pointerId);
+      try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+      if(activeStrokes.size>0 || eraserLastMap.size>0){
+        isDrawing=true;
+        currentStroke=[...activeStrokes.values()].pop()||null;
+        redraw(); return;
+      }
+      isDrawing=false; activePointerId=null; currentStroke=null; eraserLast=null;
+      redraw(); return;
+    }
+    if(e && e.pointerId!=null && eraserLastMap.has(e.pointerId)){
+      eraserLastMap.delete(e.pointerId);
+      if(canvas._activeTools) canvas._activeTools.delete(e.pointerId);
+      try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+      if(activeStrokes.size>0 || eraserLastMap.size>0){ isDrawing=true; redraw(); return; }
+      isDrawing=false; redraw(); return;
     }
     endDraw(e);
   });
