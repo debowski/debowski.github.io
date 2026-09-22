@@ -34,7 +34,7 @@
           <i class="fa-solid fa-expand"></i>
         </button>
         <button class="tool-btn" id="btn-pointer" data-tool="pointer" title="Wskaźnik – nie rysuje, do przewijania (Spacja+przeciągnij też przesuwa)">
-          <i class="fa-solid fa-arrow-pointer"></i>
+          <i class="fa-solid fa-hand"></i>
         </button>
         <button class="tool-btn" id="btn-text" data-tool="text" title="Tekst (T)">
           <i class="fa-solid fa-font"></i>
@@ -44,13 +44,13 @@
 
     <div class="toolbar__center">
       <div class="palette" id="palette">
-        <button class="color-btn active" data-color="#0f0f0f" style="--c:#0f0f0f" title="Czarny" aria-label="Czarny"></button>
-        <button class="color-btn" data-color="#ef2626" style="--c:#ef2626" title="Czerwony"></button>
-        <button class="color-btn" data-color="#2563eb" style="--c:#2563eb" title="Niebieski"></button>
-        <button class="color-btn" data-color="#16a34a" style="--c:#16a34a" title="Zielony"></button>
-        <button class="color-btn" data-color="#eab308" style="--c:#eab308" title="Żółty"></button>
-        <button class="color-btn" data-color="#9333ea" style="--c:#9333ea" title="Fioletowy"></button>
-        <button class="color-btn" data-color="#ffffff" style="--c:#ffffff" title="Biały" aria-label="Biały"></button>
+        <button class="color-btn active" data-color="#0f0f0f" style="--c:#0f0f0f" title="Czarny (1)" aria-label="Czarny">1</button>
+        <button class="color-btn" data-color="#ef2626" style="--c:#ef2626" title="Czerwony (2)">2</button>
+        <button class="color-btn" data-color="#2563eb" style="--c:#2563eb" title="Niebieski (3)">3</button>
+        <button class="color-btn" data-color="#16a34a" style="--c:#16a34a" title="Zielony (4)">4</button>
+        <button class="color-btn" data-color="#eab308" style="--c:#eab308" title="Żółty (5)">5</button>
+        <button class="color-btn" data-color="#9333ea" style="--c:#9333ea" title="Fioletowy (6)">6</button>
+        <button class="color-btn" data-color="#ffffff" style="--c:#ffffff" title="Biały (7)" aria-label="Biały">7</button>
         <label class="color-picker" title="Wybierz dowolny kolor">
           <input type="color" id="color-input" value="#0f0f0f">
           <i class="fa-solid fa-eye-dropper"></i>
@@ -74,6 +74,8 @@
       <div class="tool-group">
         <button class="tool-btn" id="btn-undo" title="Cofnij (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
         <button class="tool-btn" id="btn-redo" title="Ponów (Ctrl+Shift+Z)"><i class="fa-solid fa-rotate-right"></i></button>
+        <button class="tool-btn" id="btn-copy" title="Kopiuj zaznaczenie (Ctrl+C)"><i class="fa-solid fa-copy"></i></button>
+        <button class="tool-btn" id="btn-paste" title="Wklej (Ctrl+V)"><i class="fa-solid fa-paste"></i></button>
       </div>
       <div class="toolbar__divider"></div>
       <div class="zoom-group" id="zoom-group">
@@ -88,13 +90,14 @@
         <option value="grid">Kratka</option>
         <option value="lines">Linie</option>
         <option value="dots">Kropki</option>
+        <option value="cartesian">Kartezjański</option>
       </select>
       <button class="btn btn--ghost" id="btn-clear" title="Wyczyść tablicę (Del)">
-        <i class="fa-solid fa-trash-can"></i> <span class="hide-mobile">Wyczyść</span>
+        <i class="fa-solid fa-trash-can"></i>
       </button>
       <div style="position:relative;">
         <button class="btn btn--ghost" id="btn-more" title="Więcej – eksport/import/zapis (9 kropek)">
-          <i class="fa-solid fa-grip"></i> <span class="hide-mobile">Więcej</span>
+          <i class="fa-solid fa-grip"></i>
         </button>
         <div id="more-menu" class="more-menu" hidden>
           <button class="btn btn--ghost" id="btn-save" title="Zapisz jako PNG"><i class="fa-solid fa-download"></i> Zapisz PNG</button>

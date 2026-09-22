@@ -45,6 +45,8 @@
   let isDrawing = false;
   let lastX = 0, lastY = 0;
   let eraserLast = null; // {x,y} do ciągłego wymazywania
+  let lineStart = null;
+  let lineStartPressure = 0.5;
 
   // obrazy: {id, src, x,y,w,h, _img}
   let images = [];
@@ -55,6 +57,8 @@
   let editingText = null; // {id, isNew, el, originalText}
   let selectedTextIndices = [];
   let selectedTextOriginals = [];
+  // schowek do kopiowania linii
+  let clipboard = null; // {strokes, images, texts, pasteCount}
 
   // Select / move – wektorowo
   let selection = null; // {x,y,w,h} CSS px
@@ -119,7 +123,7 @@
   }
 
   function applyBackground(){
-    wrap.classList.remove('bg-white','bg-grid','bg-lines','bg-dots');
+    wrap.classList.remove('bg-white','bg-grid','bg-lines','bg-dots','bg-cartesian');
     wrap.classList.add('bg-'+bg);
     updateBackgroundZoom();
   }
@@ -132,6 +136,9 @@
       wrap.style.backgroundPosition = `${12*s}px ${12*s}px`;
     } else if(bg==='lines'){
       wrap.style.backgroundSize = `100% ${28*s}px, ${72*s}px 100%`;
+    } else if(bg==='cartesian'){
+      wrap.style.backgroundSize = `100% 100%, 100% 100%`;
+      wrap.style.backgroundPosition = `0 0, 0 0`;
     } else {
       wrap.style.backgroundSize = '';
       wrap.style.backgroundPosition = '';
@@ -181,6 +188,17 @@
     } else if(bgType==='dots'){
       tctx.fillStyle= dark ? '#334155' : '#e2e8f0'; const step=24*ratio, r=1.2*ratio;
       for(let x=16*ratio;x<cssW*ratio;x+=step) for(let y=16*ratio;y<cssH*ratio;y+=step){ tctx.beginPath(); tctx.arc(x,y,r,0,Math.PI*2); tctx.fill(); }
+    } else if(bgType==='cartesian'){
+      tctx.strokeStyle= dark ? '#3b82f6' : '#2563eb'; tctx.lineWidth=1.2*ratio;
+      tctx.beginPath();
+      const cx=cssW*ratio/2, cy=cssH*ratio/2;
+      tctx.moveTo(cx,0); tctx.lineTo(cx,cssH*ratio);
+      tctx.moveTo(0,cy); tctx.lineTo(cssW*ratio,cy);
+      tctx.stroke();
+      const arrow=8*ratio;
+      tctx.fillStyle= dark ? '#3b82f6' : '#2563eb';
+      tctx.beginPath(); tctx.moveTo(cssW*ratio,cy); tctx.lineTo(cssW*ratio-arrow,cy-arrow/2); tctx.lineTo(cssW*ratio-arrow,cy+arrow/2); tctx.closePath(); tctx.fill();
+      tctx.beginPath(); tctx.moveTo(cx,0); tctx.lineTo(cx-arrow/2,arrow); tctx.lineTo(cx+arrow/2,arrow); tctx.closePath(); tctx.fill();
     }
     tctx.restore();
   }
@@ -732,7 +750,7 @@
       hint.textContent='Kliknij aby dodać tekst. Kliknij istniejący tekst aby edytować. Spacja+przeciągnij = przesuwanie.';
       hint.classList.remove('hide');
     } else {
-      hint.textContent='Rysuj palcem / myszą / piórkiem. Spacja+przeciągnij = przesuwanie. Odwróć rysik = gumka. V = zaznacz. T = tekst.';
+      hint.textContent='Rysuj palcem / myszą / piórkiem. 1-7 kolory, [ ] rozmiar, Spacja+przeciągnij = przesuwanie. V = zaznacz, T = tekst.';
     }
   }
   function updateCursor(){
@@ -780,6 +798,66 @@
     canvas.classList.remove('select--move');
     if(!push && had) redraw();
     else if(!push) updateSelectionUI();
+    updateCopyPasteButtons();
+  }
+  function updateCopyPasteButtons(){
+    const hasSel = selectedIndices.length>0 || selectedImageIndices.length>0 || selectedTextIndices.length>0;
+    const hasClip = clipboard && (clipboard.strokes.length>0 || clipboard.images.length>0 || clipboard.texts.length>0);
+    const bCopy=document.getElementById('btn-copy');
+    const bPaste=document.getElementById('btn-paste');
+    if(bCopy){ bCopy.disabled=!hasSel; bCopy.style.opacity=hasSel?1:.45; }
+    if(bPaste){ bPaste.disabled=!hasClip; bPaste.style.opacity=hasClip?1:.45; }
+  }
+  function copySelection(){
+    if(!selection || (selectedIndices.length===0 && selectedImageIndices.length===0 && selectedTextIndices.length===0)) return false;
+    const clipStrokes = selectedIndices.map(i=> {
+      const s=strokes[i];
+      return {color:s.color, baseWidth:s.baseWidth, usePressure:s.usePressure, points: s.points.map(p=>({...p})) };
+    });
+    const clipImages = selectedImageIndices.map(i=>{
+      const im=images[i];
+      return {src:im.src, x:im.x, y:im.y, w:im.w, h:im.h};
+    });
+    const clipTexts = selectedTextIndices.map(i=>{
+      const t=texts[i];
+      return {...t};
+    });
+    clipboard = { strokes:clipStrokes, images:clipImages, texts:clipTexts, pasteCount:0 };
+    updateCopyPasteButtons();
+    return true;
+  }
+  function pasteClipboard(){
+    if(!clipboard || (clipboard.strokes.length===0 && clipboard.images.length===0 && clipboard.texts.length===0)) return false;
+    clipboard.pasteCount = (clipboard.pasteCount||0)+1;
+    const off = 22/scale + (clipboard.pasteCount-1)*8/scale;
+    pushHistory();
+    const newStrokeIndices=[];
+    const newImageIndices=[];
+    const newTextIndices=[];
+    for(const s of clipboard.strokes){
+      const ns={id: Date.now()+Math.random(), color:s.color, baseWidth:s.baseWidth, usePressure:s.usePressure, points: s.points.map(p=>({x:p.x+off, y:p.y+off, pressure:p.pressure}))};
+      strokes.push(ns);
+      newStrokeIndices.push(strokes.length-1);
+    }
+    for(const im of clipboard.images){
+      const nim={id: Date.now()+Math.random(), src:im.src, x:im.x+off, y:im.y+off, w:im.w, h:im.h, _img:null};
+      const img=new Image(); img.src=im.src; img.onload=()=>redraw(); nim._img=img;
+      images.push(nim);
+      newImageIndices.push(images.length-1);
+    }
+    for(const t of clipboard.texts){
+      const nt={id: Date.now()+Math.random(), x:t.x+off, y:t.y+off, text:t.text, color:t.color, size:t.size};
+      texts.push(nt);
+      newTextIndices.push(texts.length-1);
+    }
+    selectedIndices=newStrokeIndices;
+    selectedImageIndices=newImageIndices;
+    selectedTextIndices=newTextIndices;
+    const bbox=computeSelectionBBox();
+    if(bbox) selection={x:bbox.x, y:bbox.y, w:bbox.w, h:bbox.h}; else selection=null;
+    setTool('select');
+    updateSelectionUI(); redraw(); updateCopyPasteButtons();
+    return true;
   }
   function findIndicesInRect(rect){
     const idx=[];
@@ -894,7 +972,7 @@
       const bbox=computeSelectionBBox();
       if(bbox){ selection={x:bbox.x, y:bbox.y, w:bbox.w, h:bbox.h}; }
       else selection=null;
-      updateSelectionUI(); redraw();
+      updateSelectionUI(); redraw(); updateCopyPasteButtons();
       canvas.setPointerCapture(e.pointerId); activePointerId=e.pointerId;
       e.preventDefault(); return true;
     }
@@ -966,9 +1044,9 @@
         const bbox=computeSelectionBBox();
         if(bbox) selection={x:bbox.x, y:bbox.y, w:bbox.w, h:bbox.h}; else selection=null;
         if(!selection || (!selectedIndices.length && !selectedImageIndices.length && !selectedTextIndices.length)){
-          // nic nie trafiono – zostaw prostokąt
+          // nic nie trafiono
         }
-        updateSelectionUI(); redraw();
+        updateSelectionUI(); redraw(); updateCopyPasteButtons();
       }
       lassoPoints=null; selStart=null;
       if(activePointerId!==null) try{canvas.releasePointerCapture(activePointerId);}catch(_){}
@@ -1055,6 +1133,7 @@
     pushHistory();
     currentStroke={id: Date.now()+Math.random(), color, baseWidth, usePressure, points:[{x,y,pressure}]};
     strokes.push(currentStroke);
+    lineStart={x,y}; lineStartPressure=pressure;
     // narysuj kropkę (z uwzględnieniem skali)
     const w=widthForPressure(pressure, baseWidth);
     ctx.save(); ctx.setTransform(scale*dpr(),0,0,scale*dpr(), panX*dpr(), panY*dpr());
@@ -1091,6 +1170,17 @@
       return;
     }
     if(currentStroke){
+      const isShift = evts.some(ce=>ce.shiftKey) || e.shiftKey;
+      if(isShift && lineStart){
+        let added=false;
+        for(const ce of evts){
+          const {x,y,pressure}=getPos(ce);
+          currentStroke.points=[{x:lineStart.x, y:lineStart.y, pressure:lineStartPressure}, {x,y,pressure}];
+          lastX=x; lastY=y; added=true;
+        }
+        if(added) redraw();
+        return;
+      }
       let added=false;
       for(const ce of evts){
         const {x,y,pressure}=getPos(ce);
@@ -1112,7 +1202,7 @@
     if(!isDrawing) return;
     if(e && activePointerId!==null && e.pointerId!==activePointerId) return;
     isDrawing=false; activePointerId=null;
-    currentStroke=null; eraserLast=null;
+    currentStroke=null; eraserLast=null; lineStart=null;
     ctx.globalCompositeOperation='source-over';
     redraw();
     updateCursor();
@@ -1152,6 +1242,20 @@
   bgSelect.addEventListener('change', e=>{ bg=e.target.value; applyBackground(); });
   btnTheme?.addEventListener('click', ()=> applyTheme(!isDarkMode()));
   btnToolbarPos?.addEventListener('click', ()=> applyToolbarPos(!isToolbarRight()));
+  document.getElementById('btn-copy')?.addEventListener('click', ()=>{
+    if(copySelection()){
+      hint.textContent='Skopiowano (Ctrl+V wklej)';
+      hint.classList.remove('hide');
+      setTimeout(()=>hint.classList.add('hide'),2000);
+    }
+  });
+  document.getElementById('btn-paste')?.addEventListener('click', ()=>{
+    if(pasteClipboard()){
+      hint.textContent='Wklejono';
+      hint.classList.remove('hide');
+      setTimeout(()=>hint.classList.add('hide'),1500);
+    }
+  });
   const btnMore=document.getElementById('btn-more');
   const moreMenu=document.getElementById('more-menu');
   btnMore?.addEventListener('click', (e)=>{
@@ -1305,7 +1409,7 @@
     reader.readAsDataURL(file);
     return true;
   }
-  // Ctrl+V – wklejanie ze schowka
+  // Ctrl+V – wklejanie ze schowka (obrazy z systemu mają priorytet, potem linie z wewnętrznego schowka)
   document.addEventListener('paste', e=>{
     const ae=document.activeElement;
     if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.isContentEditable)) return;
@@ -1324,7 +1428,16 @@
         if(f.type.startsWith('image/')){ addImageFromFile(f); handled=true; }
       }
     }
-    if(handled) e.preventDefault();
+    if(handled){
+      e.preventDefault();
+      return;
+    }
+    // brak obrazu w schowku systemowym – spróbuj wkleić skopiowane linie z wewnętrznego schowka
+    if(clipboard && (clipboard.strokes.length>0 || clipboard.images.length>0 || clipboard.texts.length>0)){
+      if(pasteClipboard()){
+        e.preventDefault();
+      }
+    }
   });
   // drag & drop obrazów + SVG
   wrap.addEventListener('dragover', e=>{
@@ -1392,6 +1505,14 @@
     } else if(bg==='dots'){
       svg += `<defs><pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="12" cy="12" r="1.2" fill="#e2e8f0"/></pattern></defs>\n`;
       svg += `<rect x="${bbox?bbox.minX:0}" y="${bbox?bbox.minY:0}" width="${vbW}" height="${vbH}" fill="url(#dots)"/>\n`;
+    } else if(bg==='cartesian'){
+      const isDark=document.documentElement.classList.contains('dark');
+      const axisCol=isDark?'#3b82f6':'#2563eb';
+      const cx=(bbox?bbox.minX:0)+vbW/2, cy=(bbox?bbox.minY:0)+vbH/2;
+      svg += `<line x1="${cx}" y1="${bbox?bbox.minY:0}" x2="${cx}" y2="${(bbox?bbox.minY:0)+vbH}" stroke="${axisCol}" stroke-width="1.2"/>\n`;
+      svg += `<line x1="${bbox?bbox.minX:0}" y1="${cy}" x2="${(bbox?bbox.minX:0)+vbW}" y2="${cy}" stroke="${axisCol}" stroke-width="1.2"/>\n`;
+      svg += `<polygon points="${(bbox?bbox.minX:0)+vbW},${cy} ${(bbox?bbox.minX:0)+vbW-8},${cy-4} ${(bbox?bbox.minX:0)+vbW-8},${cy+4}" fill="${axisCol}"/>\n`;
+      svg += `<polygon points="${cx},${bbox?bbox.minY:0} ${cx-4},${(bbox?bbox.minY:0)+8} ${cx+4},${(bbox?bbox.minY:0)+8}" fill="${axisCol}"/>\n`;
     }
     // metadata – pełny zapis wektorów do idealnego importu
     try{
@@ -1563,6 +1684,7 @@
     }
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); if(e.shiftKey) redo(); else undo(); }
     else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); }
+    else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='c'){ if(editingText) return; const ae=document.activeElement; if(ae && (ae.tagName==='TEXTAREA' || ae.tagName==='INPUT' || ae.isContentEditable)) return; if(copySelection()){ e.preventDefault(); hint.textContent='Skopiowano (Ctrl+V wklej)'; hint.classList.remove('hide'); setTimeout(()=>hint.classList.add('hide'),2000); } }
     else if((e.ctrlKey||e.metaKey) && (e.key==='0' || e.key===' ')){ e.preventDefault(); resetView(); }
     else if((e.ctrlKey||e.metaKey) && (e.key==='+' || e.key==='=')){ e.preventDefault(); zoomIn(); }
     else if((e.ctrlKey||e.metaKey) && (e.key==='-' || e.key==='_')){ e.preventDefault(); zoomOut(); }
@@ -1578,6 +1700,11 @@
     else if(e.key==='r'||e.key==='R'){ if(!e.ctrlKey && !e.metaKey && !e.altKey){ e.preventDefault(); applyToolbarPos(!isToolbarRight()); } }
     else if(e.key==='[' || e.key==='{' ){ if(!e.ctrlKey && !e.metaKey){ e.preventDefault(); baseWidth=Math.max(1, baseWidth-1); sizeRange.value=baseWidth; sizeLabel.textContent=baseWidth+' px'; updateCursor(); } }
     else if(e.key===']' || e.key==='}' ){ if(!e.ctrlKey && !e.metaKey){ e.preventDefault(); baseWidth=Math.min(48, baseWidth+1); sizeRange.value=baseWidth; sizeLabel.textContent=baseWidth+' px'; updateCursor(); } }
+    else if(e.key>='1' && e.key<='7' && !e.ctrlKey && !e.metaKey && !e.altKey){
+      const map={'1':'#0f0f0f','2':'#ef2626','3':'#2563eb','4':'#16a34a','5':'#eab308','6':'#9333ea','7':'#ffffff'};
+      const c=map[e.key];
+      if(c){ e.preventDefault(); color=c; colorInput.value=c; paletteBtns.forEach(x=>x.classList.remove('active')); document.querySelector(`.color-btn[data-color="${c}"]`)?.classList.add('active'); if(tool==='eraser') setTool('pen'); updateCursor(); }
+    }
     else if(e.code==='Space' || e.key===' '){
       const ae=document.activeElement;
       if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.isContentEditable)) return;
@@ -1644,6 +1771,7 @@
     resizeCanvas(false);
     updateCachedRect();
     setTool(tool);
+    updateCopyPasteButtons();
     updateUndoRedo();
     updateZoomLabel();
     updateBackgroundZoom();
