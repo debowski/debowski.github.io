@@ -36,6 +36,9 @@
         <button class="tool-btn" id="btn-pointer" data-tool="pointer" title="Wskaźnik – nie rysuje, do przewijania (Spacja+przeciągnij też przesuwa)">
           <i class="fa-solid fa-arrow-pointer"></i>
         </button>
+        <button class="tool-btn" id="btn-text" data-tool="text" title="Tekst (T)">
+          <i class="fa-solid fa-font"></i>
+        </button>
       </div>
     </div>
 
@@ -47,6 +50,7 @@
         <button class="color-btn" data-color="#16a34a" style="--c:#16a34a" title="Zielony"></button>
         <button class="color-btn" data-color="#eab308" style="--c:#eab308" title="Żółty"></button>
         <button class="color-btn" data-color="#9333ea" style="--c:#9333ea" title="Fioletowy"></button>
+        <button class="color-btn" data-color="#ffffff" style="--c:#ffffff" title="Biały" aria-label="Biały"></button>
         <label class="color-picker" title="Wybierz dowolny kolor">
           <input type="color" id="color-input" value="#0f0f0f">
           <i class="fa-solid fa-eye-dropper"></i>
@@ -55,7 +59,7 @@
 
       <div class="size-group">
         <i class="fa-solid fa-circle" style="font-size:10px; opacity:.5"></i>
-        <input type="range" id="size-range" min="1" max="48" value="4" title="Grubość linii">
+        <input type="range" id="size-range" min="1" max="48" value="4" title="Grubość linii ([ ] zmniejsz/zwiększ)">
         <i class="fa-solid fa-circle" style="font-size:18px; opacity:.8"></i>
         <span id="size-label" class="size-label">4 px</span>
       </div>
@@ -88,16 +92,25 @@
       <button class="btn btn--ghost" id="btn-clear" title="Wyczyść tablicę (Del)">
         <i class="fa-solid fa-trash-can"></i> <span class="hide-mobile">Wyczyść</span>
       </button>
-      <button class="btn btn--ghost" id="btn-save" title="Zapisz jako PNG">
-        <i class="fa-solid fa-download"></i> <span class="hide-mobile">Zapisz</span>
-      </button>
-      <div class="tool-group">
-        <button class="btn btn--ghost" id="btn-export-svg" title="Eksportuj SVG (wektor)"><i class="fa-solid fa-file-code"></i> <span class="hide-mobile">SVG</span></button>
-        <button class="btn btn--ghost" id="btn-import-svg" title="Importuj SVG"><i class="fa-solid fa-file-arrow-up"></i> <span class="hide-mobile">Import</span></button>
-        <input type="file" id="import-svg-input" accept=".svg,image/svg+xml" hidden>
-        <button class="btn btn--ghost" id="btn-import-image" title="Wklej/wgraj obraz (Ctrl+V, drag&drop)"><i class="fa-solid fa-image"></i> <span class="hide-mobile">Obraz</span></button>
-        <input type="file" id="import-image-input" accept="image/*" hidden>
+      <div style="position:relative;">
+        <button class="btn btn--ghost" id="btn-more" title="Więcej – eksport/import/zapis (9 kropek)">
+          <i class="fa-solid fa-grip"></i> <span class="hide-mobile">Więcej</span>
+        </button>
+        <div id="more-menu" class="more-menu" hidden>
+          <button class="btn btn--ghost" id="btn-save" title="Zapisz jako PNG"><i class="fa-solid fa-download"></i> Zapisz PNG</button>
+          <button class="btn btn--ghost" id="btn-export-svg" title="Eksportuj SVG (wektor)"><i class="fa-solid fa-file-code"></i> Eksportuj SVG</button>
+          <button class="btn btn--ghost" id="btn-import-svg" title="Importuj SVG"><i class="fa-solid fa-file-arrow-up"></i> Importuj SVG</button>
+          <button class="btn btn--ghost" id="btn-import-image" title="Wklej/wgraj obraz (Ctrl+V, drag&drop)"><i class="fa-solid fa-image"></i> Wgraj obraz</button>
+          <input type="file" id="import-svg-input" accept=".svg,image/svg+xml" hidden>
+          <input type="file" id="import-image-input" accept="image/*" hidden>
+        </div>
       </div>
+      <button class="btn btn--ghost" id="btn-toolbar-pos" title="Przenieś pasek na prawo/lewo (R)">
+        <i class="fa-solid fa-angles-right"></i>
+      </button>
+      <button class="btn btn--ghost" id="btn-theme" title="Tryb ciemny (D)">
+        <i class="fa-solid fa-moon"></i>
+      </button>
       <button class="btn btn--primary" id="btn-fullscreen" title="Pełny ekran (F)">
         <i class="fa-solid fa-expand"></i>
       </button>
@@ -122,6 +135,7 @@
     <button class="tool-btn active" data-tool="pen"><i class="fa-solid fa-pen"></i></button>
     <button class="tool-btn" data-tool="eraser"><i class="fa-solid fa-eraser"></i></button>
     <button class="tool-btn" data-tool="select"><i class="fa-solid fa-expand"></i></button>
+    <button class="tool-btn" data-tool="text"><i class="fa-solid fa-font"></i></button>
     <button class="tool-btn" id="m-undo"><i class="fa-solid fa-rotate-left"></i></button>
     <button class="btn btn--danger" id="m-clear"><i class="fa-solid fa-trash-can"></i></button>
     <button class="btn btn--primary" id="m-save"><i class="fa-solid fa-download"></i></button>

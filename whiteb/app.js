@@ -16,6 +16,9 @@
   const btnClear = document.getElementById('btn-clear');
   const btnSave = document.getElementById('btn-save');
   const btnFullscreen = document.getElementById('btn-fullscreen');
+  const btnTheme = document.getElementById('btn-theme');
+  const btnToolbarPos = document.getElementById('btn-toolbar-pos');
+  const appEl = document.getElementById('app');
   const clearDialog = document.getElementById('clear-dialog');
   const cursor = document.getElementById('cursor');
 
@@ -31,6 +34,10 @@
   let isPanning = false, panStart = null, panOrig = null;
   let pinchStartDist = null, pinchStartScale = 1;
   let isSpacePressed = false;
+  const isFirefox = navigator.userAgent.includes('Firefox');
+  let cachedWrapRect=null;
+  function updateCachedRect(){ try{ cachedWrapRect=wrap.getBoundingClientRect(); }catch(_){} }
+  let lastRedrawTime=0;
 
   // wektorowe strokes: {id, color, baseWidth, usePressure, points:[{x,y,pressure}]}
   let strokes = [];
@@ -38,13 +45,16 @@
   let isDrawing = false;
   let lastX = 0, lastY = 0;
   let eraserLast = null; // {x,y} do ciągłego wymazywania
-  // wielodotyk – mapa pointerId -> stroke / eraser
-  const activeStrokes = new Map();
-  const eraserLastMap = new Map();
 
   // obrazy: {id, src, x,y,w,h, _img}
   let images = [];
   let lastMouseWorld = null;
+
+  // teksty: {id, x,y, text, color, size}
+  let texts = [];
+  let editingText = null; // {id, isNew, el, originalText}
+  let selectedTextIndices = [];
+  let selectedTextOriginals = [];
 
   // Select / move – wektorowo
   let selection = null; // {x,y,w,h} CSS px
@@ -55,6 +65,7 @@
   let isSelecting = false;
   let isDraggingSel = false;
   let selStart = null;
+  let lassoPoints = null;
   let dragStart = null;
   let dragOffset = null;
   let selPos = null; // aktualna pozycja ramki podczas drag
@@ -67,6 +78,45 @@
   const redoStack = [];
 
   function dpr(){ return Math.max(1, window.devicePixelRatio||1); }
+  let pendingRedraw=false;
+  function requestRedrawThrottled(){
+    const now=performance.now();
+    if(now - lastRedrawTime < 16){
+      if(!pendingRedraw){
+        pendingRedraw=true;
+        requestAnimationFrame(()=>{ pendingRedraw=false; lastRedrawTime=performance.now(); redraw(); });
+      }
+      return;
+    }
+    lastRedrawTime=now;
+    redraw();
+  }
+  function isToolbarRight(){ return appEl && appEl.classList.contains('toolbar-right'); }
+  function applyToolbarPos(right){
+    if(!appEl) return;
+    appEl.classList.toggle('toolbar-right', right);
+    localStorage.setItem('whiteb-toolbar-pos', right ? 'right' : 'top');
+    if(btnToolbarPos){
+      btnToolbarPos.innerHTML = right ? '<i class="fa-solid fa-angles-left"></i>' : '<i class="fa-solid fa-angles-right"></i>';
+      btnToolbarPos.title = right ? 'Przenieś pasek na górę (R)' : 'Przenieś pasek na prawo (R)';
+    }
+    document.getElementById('more-menu')?.setAttribute('hidden','');
+    updateCachedRect();
+    setTimeout(()=>{ resizeCanvas(true); }, 50);
+  }
+  function isDarkMode(){ return document.documentElement.classList.contains('dark'); }
+  function applyTheme(dark){
+    document.documentElement.classList.toggle('dark', dark);
+    localStorage.setItem('whiteb-theme', dark ? 'dark' : 'light');
+    const meta=document.querySelector('meta[name="theme-color"]');
+    if(meta) meta.setAttribute('content', dark ? '#0b1220' : '#ffffff');
+    if(btnTheme) btnTheme.innerHTML = dark ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
+    if(btnTheme) btnTheme.title = dark ? 'Tryb jasny (D)' : 'Tryb ciemny (D)';
+    // auto-swap czarny <-> biały dla widoczności na zmianie tła (domyślnie biały w dark mode)
+    if(dark && (color==='#0f0f0f' || color==='#000000')){ color='#ffffff'; colorInput.value=color; paletteBtns.forEach(x=>x.classList.remove('active')); document.querySelector('.color-btn[data-color="#ffffff"]')?.classList.add('active'); updateCursor(); }
+    else if(!dark && (color==='#ffffff' || color==='#f8fafc')){ color='#0f0f0f'; colorInput.value=color; paletteBtns.forEach(x=>x.classList.remove('active')); document.querySelector('.color-btn[data-color="#0f0f0f"]')?.classList.add('active'); updateCursor(); }
+    redraw();
+  }
 
   function applyBackground(){
     wrap.classList.remove('bg-white','bg-grid','bg-lines','bg-dots');
@@ -99,6 +149,7 @@
     scale = newScale;
     panX = cx - wx*scale;
     panY = cy - wy*scale;
+    updateCachedRect();
     updateZoomLabel();
     updateBackgroundZoom();
     updateCursor();
@@ -107,27 +158,28 @@
   }
   function zoomIn(center){ setZoom(scale*1.22, center?.x, center?.y); }
   function zoomOut(center){ setZoom(scale/1.22, center?.x, center?.y); }
-  function resetView(){ scale=1; panX=0; panY=0; updateZoomLabel(); updateBackgroundZoom(); updateCursor(); redraw(); updateSelectionUI(); }
+  function resetView(){ scale=1; panX=0; panY=0; updateCachedRect(); updateZoomLabel(); updateBackgroundZoom(); updateCursor(); redraw(); updateSelectionUI(); }
   function updateZoomLabel(){
     const el=document.getElementById('zoom-label');
     if(el) el.textContent = Math.round(scale*100)+'%';
   }
   function drawBackgroundForExport(tctx, cssW, cssH, bgType, ratio){
+    const dark=isDarkMode();
     tctx.save();
-    tctx.fillStyle='#ffffff';
+    tctx.fillStyle= dark ? '#0f172a' : '#ffffff';
     tctx.fillRect(0,0, cssW*ratio, cssH*ratio);
     if(bgType==='grid'){
-      tctx.strokeStyle='#e2e8f0'; tctx.lineWidth=0.6*ratio; const step=32*ratio;
+      tctx.strokeStyle= dark ? '#1e293b' : '#e2e8f0'; tctx.lineWidth=0.6*ratio; const step=32*ratio;
       tctx.beginPath();
       for(let x=0;x<cssW*ratio;x+=step){ tctx.moveTo(x,0); tctx.lineTo(x,cssH*ratio); }
       for(let y=0;y<cssH*ratio;y+=step){ tctx.moveTo(0,y); tctx.lineTo(cssW*ratio,y); }
       tctx.stroke();
     } else if(bgType==='lines'){
-      tctx.strokeStyle='#e2e8f0'; tctx.lineWidth=0.7*ratio; const step=28*ratio;
+      tctx.strokeStyle= dark ? '#1e293b' : '#e2e8f0'; tctx.lineWidth=0.7*ratio; const step=28*ratio;
       tctx.beginPath(); for(let y=step;y<cssH*ratio;y+=step){ tctx.moveTo(0,y); tctx.lineTo(cssW*ratio,y); } tctx.stroke();
-      tctx.strokeStyle='#fecaca'; tctx.beginPath(); tctx.moveTo(72*ratio,0); tctx.lineTo(72*ratio,cssH*ratio); tctx.stroke();
+      tctx.strokeStyle= dark ? '#7f1d1d' : '#fecaca'; tctx.beginPath(); tctx.moveTo(72*ratio,0); tctx.lineTo(72*ratio,cssH*ratio); tctx.stroke();
     } else if(bgType==='dots'){
-      tctx.fillStyle='#e2e8f0'; const step=24*ratio, r=1.2*ratio;
+      tctx.fillStyle= dark ? '#334155' : '#e2e8f0'; const step=24*ratio, r=1.2*ratio;
       for(let x=16*ratio;x<cssW*ratio;x+=step) for(let y=16*ratio;y<cssH*ratio;y+=step){ tctx.beginPath(); tctx.arc(x,y,r,0,Math.PI*2); tctx.fill(); }
     }
     tctx.restore();
@@ -140,6 +192,7 @@
     canvas.height = Math.round(rect.height * ratio);
     canvas.style.width = rect.width + 'px';
     canvas.style.height = rect.height + 'px';
+    updateCachedRect();
     // transform ustawiany w redraw()
     // wektory są w world px – view transform w redraw
     redraw();
@@ -149,22 +202,32 @@
   }
 
   function getPos(e){
-    const rect = canvas.getBoundingClientRect();
+    const rect = (isFirefox ? canvas.getBoundingClientRect() : (cachedWrapRect || canvas.getBoundingClientRect()));
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
     const w = screenToWorld(sx, sy);
-    return {x: w.x, y: w.y, sx, sy, pressure: e.pressure ?? 0.5, pointerType: e.pointerType};
+    const pr = e.pressure ?? e.mozPressure ?? 0.5;
+    return {x: w.x, y: w.y, sx, sy, pressure: pr, pointerType: e.pointerType};
   }
 
   // --- Historia wektorowa ---
-  function cloneStrokes(arr){ return JSON.parse(JSON.stringify(arr)); }
+  function cloneStrokes(arr){
+    try{
+      return arr.map(s=> ({...s, points: s.points.map(p=> ({...p})) }));
+    }catch(_){
+      try{ if(typeof structuredClone==='function') return structuredClone(arr); }catch(_){}
+      return JSON.parse(JSON.stringify(arr));
+    }
+  }
   function getHistorySnapshot(){
     return {
       strokes: cloneStrokes(strokes),
-      images: images.map(im=> ({id:im.id, src:im.src, x:im.x, y:im.y, w:im.w, h:im.h}))
+      images: images.map(im=> ({id:im.id, src:im.src, x:im.x, y:im.y, w:im.w, h:im.h})),
+      texts: JSON.parse(JSON.stringify(texts))
     };
   }
   function restoreSnapshot(snap){
+    if(editingText) cancelTextEdit(false);
     strokes = cloneStrokes(snap.strokes||[]);
     const restored = (snap.images||[]).map(d=>{
       const im={id:d.id, src:d.src, x:d.x, y:d.y, w:d.w, h:d.h, _img:null};
@@ -175,6 +238,7 @@
       return im;
     });
     images=restored;
+    texts = JSON.parse(JSON.stringify(snap.texts||[]));
     redraw();
   }
   function pushHistory(){
@@ -213,8 +277,10 @@
   }
   function clearCanvas(push=true){
     if(push) pushHistory();
+    if(editingText) cancelTextEdit(false);
     strokes = [];
     images = [];
+    texts = [];
     clearSelection(false);
     redraw();
     applyBackground();
@@ -229,54 +295,27 @@
     const factor = 0.45 + p*0.95;
     return Math.max(1, base * factor);
   }
-  // zwiększone wygładzanie – dwuprzebiegowe, końce wtapiane (likwiduje schodki)
+  // wykrywa mikro-ruchy 1mm – próg 0.01px, Firefox 0 (brak filtrowania)
   function smoothPoints(points){
     if(!points || points.length < 3) return points;
+    const thr = isFirefox ? 0 : 0.01;
     const filtered=[points[0]];
     for(let i=1;i<points.length;i++){
       const dx=points[i].x-filtered[filtered.length-1].x, dy=points[i].y-filtered[filtered.length-1].y;
-      if(Math.hypot(dx,dy) >= 0.6) filtered.push(points[i]);
+      if(Math.hypot(dx,dy) >= thr) filtered.push(points[i]);
     }
     if(filtered.length < 3) return filtered;
     const n=filtered.length;
-    const pass1=new Array(n);
-    pass1[0]={...filtered[0]};
-    pass1[n-1]={...filtered[n-1]};
+    const out=new Array(n);
+    out[0]={...filtered[0]};
+    out[n-1]={...filtered[n-1]};
     for(let i=1;i<n-1;i++){
       const p=filtered[i-1], c=filtered[i], nn=filtered[i+1];
-      pass1[i]={
-        x: p.x*0.20 + c.x*0.60 + nn.x*0.20,
-        y: p.y*0.20 + c.y*0.60 + nn.y*0.20,
-        pressure: p.pressure*0.20 + c.pressure*0.60 + nn.pressure*0.20
+      out[i]={
+        x: p.x*0.15 + c.x*0.70 + nn.x*0.15,
+        y: p.y*0.15 + c.y*0.70 + nn.y*0.15,
+        pressure: p.pressure*0.15 + c.pressure*0.70 + nn.pressure*0.15
       };
-    }
-    const out=new Array(n);
-    out[0]={
-      x: pass1[0].x*0.65 + pass1[1].x*0.30 + pass1[2].x*0.05,
-      y: pass1[0].y*0.65 + pass1[1].y*0.30 + pass1[2].y*0.05,
-      pressure: pass1[0].pressure*0.55 + pass1[1].pressure*0.35 + pass1[2].pressure*0.10
-    };
-    out[n-1]={
-      x: pass1[n-1].x*0.65 + pass1[n-2].x*0.30 + pass1[n-3].x*0.05,
-      y: pass1[n-1].y*0.65 + pass1[n-2].y*0.30 + pass1[n-3].y*0.05,
-      pressure: pass1[n-1].pressure*0.55 + pass1[n-2].pressure*0.35 + pass1[n-3].pressure*0.10
-    };
-    for(let i=1;i<n-1;i++){
-      if(i>=2 && i<=n-3){
-        const p2=pass1[i-2], p1=pass1[i-1], c=pass1[i], n1=pass1[i+1], n2=pass1[i+2];
-        out[i]={
-          x: p2.x*0.08 + p1.x*0.22 + c.x*0.40 + n1.x*0.22 + n2.x*0.08,
-          y: p2.y*0.08 + p1.y*0.22 + c.y*0.40 + n1.y*0.22 + n2.y*0.08,
-          pressure: p2.pressure*0.10 + p1.pressure*0.25 + c.pressure*0.30 + n1.pressure*0.25 + n2.pressure*0.10
-        };
-      } else {
-        const p=pass1[i-1], c=pass1[i], nn=pass1[i+1];
-        out[i]={
-          x: p.x*0.25 + c.x*0.50 + nn.x*0.25,
-          y: p.y*0.25 + c.y*0.50 + nn.y*0.25,
-          pressure: p.pressure*0.30 + c.pressure*0.40 + nn.pressure*0.30
-        };
-      }
     }
     return out;
   }
@@ -294,9 +333,7 @@
     const widths = rawW.slice();
     if(widths.length>=3){
       const tmp=widths.slice();
-      for(let i=1;i<widths.length-1;i++) widths[i]=tmp[i-1]*0.25 + tmp[i]*0.50 + tmp[i+1]*0.25;
-      widths[0]=tmp[0]*0.60 + tmp[1]*0.40;
-      widths[widths.length-1]=tmp[widths.length-1]*0.60 + tmp[widths.length-2]*0.40;
+      for(let i=1;i<widths.length-1;i++) widths[i]=tmp[i-1]*0.15 + tmp[i]*0.70 + tmp[i+1]*0.15;
     }
     ctx.strokeStyle = st.color;
     ctx.lineCap='round'; ctx.lineJoin='round';
@@ -366,10 +403,22 @@
         ctx.restore();
       }
     }
+    // aktualizuj pozycję edytora tekstu przy zoom/pan
+    if(editingText){
+      const sp=worldToScreen(editingText.worldX, editingText.worldY);
+      editingText.el.style.left=sp.x+'px';
+      editingText.el.style.top=sp.y+'px';
+      editingText.el.style.fontSize=(editingText.size*scale)+'px';
+    }
     // rysuj wszystkie wektory w przestrzeni world
     for(const s of strokes) drawStroke(s);
+    // rysuj teksty na wierzchu (ukryj edytowany)
+    for(let i=0;i<texts.length;i++){
+      if(editingText && !editingText.isNew && editingText.existingIdx===i) continue;
+      drawText(texts[i]);
+    }
     // podświetl zaznaczone (po wierzchu, przerywane)
-    if(tool==='select' && (selectedIndices.length || selectedImageIndices.length)){
+    if(tool==='select' && (selectedIndices.length || selectedImageIndices.length || selectedTextIndices.length)){
       ctx.save();
       ctx.strokeStyle='rgba(37,99,235,0.95)';
       ctx.lineWidth=1.2; ctx.setLineDash([6,4]);
@@ -384,6 +433,13 @@
         const im = images[idx];
         if(!im) continue;
         ctx.strokeRect(im.x-3, im.y-3, im.w+6, im.h+6);
+      }
+      for(const idx of selectedTextIndices){
+        const t = texts[idx];
+        if(!t) continue;
+        const bb=getTextBBox(t);
+        if(!bb) continue;
+        ctx.strokeRect(bb.x-3, bb.y-3, bb.w+6, bb.h+6);
       }
       ctx.restore();
     }
@@ -402,6 +458,186 @@
     if(!im) return false;
     if(im.x + im.w < rect.x || im.x > rect.x+rect.w || im.y + im.h < rect.y || im.y > rect.y+rect.h) return false;
     return true;
+  }
+  function currentTextSize(){ return Math.max(14, Math.round(baseWidth*3.2 + 12)); }
+  function drawText(t){
+    if(!t || !t.text) return;
+    ctx.save();
+    ctx.font = `${t.size}px Inter, sans-serif`;
+    ctx.fillStyle = t.color;
+    ctx.textBaseline='top';
+    const lines=t.text.split('\n');
+    const lh=t.size*1.25;
+    for(let i=0;i<lines.length;i++) ctx.fillText(lines[i], t.x, t.y + i*lh);
+    ctx.restore();
+  }
+  function getTextBBox(t){
+    if(!t || !t.text) return null;
+    ctx.save();
+    ctx.font = `${t.size}px Inter, sans-serif`;
+    const lines=t.text.split('\n');
+    let maxW=0;
+    for(const line of lines){ const w=ctx.measureText(line).width; if(w>maxW) maxW=w; }
+    ctx.restore();
+    const h=lines.length*t.size*1.25;
+    const w=maxW||10;
+    return {x:t.x, y:t.y, w, h, minX:t.x, minY:t.y, maxX:t.x+w, maxY:t.y+h};
+  }
+  function isTextInRect(t, rect){
+    const bb=getTextBBox(t);
+    if(!bb) return false;
+    if(bb.maxX < rect.x || bb.minX > rect.x+rect.w || bb.maxY < rect.y || bb.minY > rect.y+rect.h) return false;
+    return true;
+  }
+  function findTextIndicesInRect(rect){
+    const idx=[];
+    texts.forEach((t,i)=>{ if(isTextInRect(t,rect)) idx.push(i); });
+    return idx;
+  }
+  function hitText(x,y){
+    for(let i=texts.length-1;i>=0;i--){
+      const bb=getTextBBox(texts[i]);
+      if(!bb) continue;
+      if(x>=bb.x && x<=bb.x+bb.w && y>=bb.y && y<=bb.y+bb.h) return i;
+    }
+    return -1;
+  }
+  function hitStrokeIndex(x,y){
+    const tol = 10/scale;
+    for(let i=strokes.length-1;i>=0;i--){
+      const s=strokes[i];
+      const bb=getStrokeBBox(s);
+      if(!bb) continue;
+      const pad=tol + (s.baseWidth||4)/2;
+      if(x < bb.minX - pad || x > bb.maxX + pad || y < bb.minY - pad || y > bb.maxY + pad) continue;
+      for(let j=0;j<s.points.length;j++){
+        const p=s.points[j];
+        if(Math.hypot(p.x-x, p.y-y) <= pad) return i;
+        if(j>0){
+          const q=s.points[j-1];
+          if(distPointToSegment(x,y, q.x,q.y, p.x,p.y) <= pad) return i;
+        }
+      }
+    }
+    return -1;
+  }
+  function hitImageIndex(x,y){
+    for(let i=images.length-1;i>=0;i--){
+      const im=images[i];
+      if(x>=im.x && x<=im.x+im.w && y>=im.y && y<=im.y+im.h) return i;
+    }
+    return -1;
+  }
+  function computeSelectionBBox(){
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    let has=false;
+    for(const idx of selectedIndices){
+      const bb=getStrokeBBox(strokes[idx]);
+      if(!bb) continue; has=true;
+      if(bb.minX<minX)minX=bb.minX; if(bb.minY<minY)minY=bb.minY;
+      if(bb.maxX>maxX)maxX=bb.maxX; if(bb.maxY>maxY)maxY=bb.maxY;
+    }
+    for(const idx of selectedImageIndices){
+      const im=images[idx]; if(!im) continue; has=true;
+      if(im.x<minX)minX=im.x; if(im.y<minY)minY=im.y;
+      if(im.x+im.w>maxX)maxX=im.x+im.w; if(im.y+im.h>maxY)maxY=im.y+im.h;
+    }
+    for(const idx of selectedTextIndices){
+      const bb=getTextBBox(texts[idx]); if(!bb) continue; has=true;
+      if(bb.minX<minX)minX=bb.minX; if(bb.minY<minY)minY=bb.minY;
+      if(bb.maxX>maxX)maxX=bb.maxX; if(bb.maxY>maxY)maxY=bb.maxY;
+    }
+    if(!has) return null;
+    const pad=4;
+    return {x:minX-pad, y:minY-pad, w:(maxX-minX)+pad*2, h:(maxY-minY)+pad*2, minX:minX-pad, minY:minY-pad, maxX:maxX+pad, maxY:maxY+pad};
+  }
+  function createTextEditor(worldX, worldY, existingIdx){
+    if(editingText) commitTextEdit(false);
+    const isEdit = existingIdx!=null && existingIdx>=0;
+    const existing = isEdit ? texts[existingIdx] : null;
+    const size = existing ? existing.size : currentTextSize();
+    const col = existing ? existing.color : color;
+    const initText = existing ? existing.text : '';
+    const screenPos = worldToScreen(worldX, worldY);
+    const ta=document.createElement('textarea');
+    ta.className='text-input';
+    ta.value=initText;
+    ta.placeholder='Wpisz tekst… (Ctrl+Enter zatwierdź, Esc anuluj)';
+    ta.style.left=screenPos.x+'px';
+    ta.style.top=screenPos.y+'px';
+    ta.style.fontSize=(size*scale)+'px';
+    ta.style.color=col;
+    ta.style.minWidth='140px';
+    ta.style.minHeight=(size*scale*1.4)+'px';
+    wrap.appendChild(ta);
+    ta.focus();
+    ta.select();
+    // autosize
+    const autoSize=()=>{
+      ta.style.height='auto';
+      ta.style.height=Math.max(size*scale*1.4, ta.scrollHeight+4)+'px';
+      const screenW=ta.scrollWidth;
+      ta.style.width=Math.min(480, Math.max(140, screenW+24))+'px';
+    };
+    autoSize();
+    ta.addEventListener('input', autoSize);
+    ta.addEventListener('keydown', (e)=>{
+      if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); cancelTextEdit(!isEdit); }
+      else if(e.key==='Enter' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); commitTextEdit(false); }
+    });
+    ta.addEventListener('blur', ()=> setTimeout(()=>{ if(editingText && editingText.el===ta) commitTextEdit(false); }, 150));
+    // śledź zoom/pan aby przesuwać edytor
+    const onViewChange=()=>{
+      if(!editingText || editingText.el!==ta) { wrap.removeEventListener('wheel', onViewChange); return; }
+      // przelicz pozycję world zachowaną w editingText.worldX/Y
+      const sp=worldToScreen(editingText.worldX, editingText.worldY);
+      ta.style.left=sp.x+'px'; ta.style.top=sp.y+'px';
+      ta.style.fontSize=(editingText.size*scale)+'px';
+    };
+    // prosty listener na redraw – będziemy wołać ręcznie
+    editingText={id: existing ? existing.id : Date.now()+Math.random(), isNew:!isEdit, el:ta, originalText:initText, worldX, worldY, size, color:col, existingIdx, _onViewChange:onViewChange};
+    // usuń stary tekst z tablicy jeśli edytujemy (będzie przywrócony przy commit)
+    if(isEdit){
+      // nie usuwaj jeszcze, tylko ukryj poprzez nie rysowanie? Zostaw, commit nadpisze
+    }
+  }
+  function commitTextEdit(keepEmpty){
+    if(!editingText) return;
+    const ta=editingText.el;
+    const txt=ta.value.trimEnd();
+    const {id, isNew, worldX, worldY, size, color:col, existingIdx} = editingText;
+    ta.remove();
+    const prevEditing=editingText;
+    editingText=null;
+    if(!txt && !keepEmpty){
+      if(isNew){
+        // nic nie dodano – nie zapisuj historii
+        redraw(); return;
+      } else {
+        // edycja wyczyszczona – usuń tekst
+        pushHistory();
+        if(existingIdx>=0) texts.splice(existingIdx,1);
+        clearSelection(false); redraw(); return;
+      }
+    }
+    if(!txt && keepEmpty){ redraw(); return; }
+    pushHistory();
+    if(!isNew && existingIdx>=0){
+      texts[existingIdx].text=txt;
+      texts[existingIdx].color=col;
+      texts[existingIdx].size=size;
+    } else {
+      texts.push({id, x:worldX, y:worldY, text:txt, color:col, size});
+    }
+    clearSelection(false); redraw();
+  }
+  function cancelTextEdit(removeNew){
+    if(!editingText) return;
+    editingText.el.remove();
+    const wasNew=editingText.isNew;
+    editingText=null;
+    if(wasNew && removeNew!==false) redraw();
+    else redraw();
   }
   function distPointToSegment(px,py, x1,y1,x2,y2){
     const l2=(x2-x1)*(x2-x1)+(y2-y1)*(y2-y1);
@@ -477,6 +713,7 @@
 
   // --- Narzędzia ---
   function setTool(t){
+    if(editingText) commitTextEdit(true);
     if(tool==='select' && t!=='select') clearSelection(false);
     tool=t;
     document.querySelectorAll('.tool-btn[data-tool]').forEach(b=> b.classList.toggle('active', b.dataset.tool===t));
@@ -484,27 +721,41 @@
     canvas.classList.toggle('eraser', t==='eraser');
     canvas.classList.toggle('select', t==='select');
     canvas.classList.toggle('pointer', t==='pointer');
+    canvas.classList.toggle('text', t==='text');
     canvas.classList.remove('select--move');
     updateCursor();
     updateSelectionUI();
     if(t==='select'){
-      hint.textContent='Zaznacz prostokątem i przeciągnij, aby przesunąć wektory/obrazy. Delete = usuń, Esc = anuluj. Spacja = przesuwanie.';
+      hint.textContent='Kliknij obiekt lub zakreśl prostokątem (Ctrl dodaje), przeciągnij zaznaczenie aby przesunąć. Delete = usuń, Esc = anuluj.';
+      hint.classList.remove('hide');
+    } else if(t==='text'){
+      hint.textContent='Kliknij aby dodać tekst. Kliknij istniejący tekst aby edytować. Spacja+przeciągnij = przesuwanie.';
       hint.classList.remove('hide');
     } else {
-      hint.textContent='Rysuj palcem / myszą / piórkiem. Spacja+przeciągnij = przesuwanie. Odwróć rysik = gumka. V = zaznacz.';
+      hint.textContent='Rysuj palcem / myszą / piórkiem. Spacja+przeciągnij = przesuwanie. Odwróć rysik = gumka. V = zaznacz. T = tekst.';
     }
   }
   function updateCursor(){
     if(tool==='pen' || tool==='eraser'){
-      const screenW = baseWidth*scale;
-      const s=Math.max(6, screenW*1.6+8);
-      cursor.style.width=s+'px'; cursor.style.height=s+'px';
-      const c=tool==='eraser'?'#ef4444':color;
-      cursor.style.borderColor=c; cursor.style.color=c;
-      cursor.style.background=tool==='eraser'?'rgba(239,68,68,.12)':'transparent';
+      cursor.classList.remove('cursor--pen','cursor--eraser');
+      if(tool==='pen'){
+        cursor.classList.add('cursor--pen');
+        const screenW = baseWidth*scale;
+        const s=Math.max(10, screenW*1.6+10);
+        cursor.style.width=s+'px'; cursor.style.height=s+'px';
+        cursor.style.borderColor=color; cursor.style.color=color;
+        cursor.style.background='transparent';
+      } else {
+        cursor.classList.add('cursor--eraser');
+        const screenR = baseWidth*3.2+6;
+        const s=Math.max(16, screenR+8);
+        cursor.style.width=s+'px'; cursor.style.height=s+'px';
+        cursor.style.borderColor='#ef4444'; cursor.style.color='#ef4444';
+        cursor.style.background='rgba(239,68,68,.14)';
+      }
       if(window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(pointer: fine)').matches) cursor.style.display='none';
       else cursor.style.display='block';
-    } else cursor.style.display='none';
+    } else { cursor.style.display='none'; cursor.classList.remove('cursor--pen','cursor--eraser'); }
   }
 
   // ---- Selection helpers (wektor) ----
@@ -522,12 +773,13 @@
     selectionBox.style.width=sW+'px'; selectionBox.style.height=sH+'px';
   }
   function clearSelection(push=false){
-    // push niepotrzebny w wektorach – historia już obsłużona przy drag
-    selection=null; selectedIndices=[]; selectedOriginals=[]; selectedImageIndices=[]; selectedImageOriginals=[]; isSelecting=false; isDraggingSel=false; selStart=null; dragStart=null; dragOffset=null; selPos=null;
+    const had = selection!==null || selectedIndices.length>0 || selectedImageIndices.length>0 || selectedTextIndices.length>0 || isSelecting || isDraggingSel || (lassoPoints && lassoPoints.length>0);
+    selection=null; selectedIndices=[]; selectedOriginals=[]; selectedImageIndices=[]; selectedImageOriginals=[]; selectedTextIndices=[]; selectedTextOriginals=[]; isSelecting=false; isDraggingSel=false; selStart=null; lassoPoints=null; dragStart=null; dragOffset=null; selPos=null;
     selectionBox.classList.remove('active','moving'); selectionBox.style.display='none';
     selectionGhost.style.display='none';
     canvas.classList.remove('select--move');
-    if(!push) redraw();
+    if(!push && had) redraw();
+    else if(!push) updateSelectionUI();
   }
   function findIndicesInRect(rect){
     const idx=[];
@@ -539,38 +791,127 @@
     images.forEach((im,i)=>{ if(isImageInRect(im,rect)) idx.push(i); });
     return idx;
   }
+  function isPointInPolygon(pt, poly){
+    let inside=false;
+    for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+      const xi=poly[i].x, yi=poly[i].y, xj=poly[j].x, yj=poly[j].y;
+      const intersect = ((yi>pt.y)!==(yj>pt.y)) && (pt.x < (xj-xi)*(pt.y-yi)/(yj-yi)+xi);
+      if(intersect) inside=!inside;
+    }
+    return inside;
+  }
+  function isStrokeInPolygon(st, poly){
+    for(const p of st.points) if(isPointInPolygon(p, poly)) return true;
+    for(let i=1;i<st.points.length;i++){
+      const a=st.points[i-1], b=st.points[i];
+      for(let j=0;j<poly.length;j++){
+        const c=poly[j], d=poly[(j+1)%poly.length];
+        if(segmentsIntersect(a.x,a.y,b.x,b.y, c.x,c.y,d.x,d.y)) return true;
+      }
+    }
+    const bb=getStrokeBBox(st);
+    if(bb && isPointInPolygon({x:bb.minX,y:bb.minY}, poly)) return true;
+    return false;
+  }
+  function isImageInPolygon(im, poly){
+    const cx=im.x+im.w/2, cy=im.y+im.h/2;
+    if(isPointInPolygon({x:cx,y:cy}, poly)) return true;
+    const corners=[{x:im.x,y:im.y},{x:im.x+im.w,y:im.y},{x:im.x+im.w,y:im.y+im.h},{x:im.x,y:im.y+im.h}];
+    for(const c of corners) if(isPointInPolygon(c, poly)) return true;
+    for(let j=0;j<poly.length;j++){
+      const a=poly[j], b=poly[(j+1)%poly.length];
+      const edges=[[{x:im.x,y:im.y},{x:im.x+im.w,y:im.y}],[{x:im.x+im.w,y:im.y},{x:im.x+im.w,y:im.y+im.h}],[{x:im.x+im.w,y:im.y+im.h},{x:im.x,y:im.y+im.h}],[{x:im.x,y:im.y+im.h},{x:im.x,y:im.y}]];
+      for(const [p,q] of edges) if(segmentsIntersect(a.x,a.y,b.x,b.y, p.x,p.y,q.x,q.y)) return true;
+    }
+    return false;
+  }
+  function isTextInPolygon(t, poly){
+    const bb=getTextBBox(t);
+    if(!bb) return false;
+    const cx=bb.x+bb.w/2, cy=bb.y+bb.h/2;
+    if(isPointInPolygon({x:cx,y:cy}, poly)) return true;
+    const corners=[{x:bb.x,y:bb.y},{x:bb.x+bb.w,y:bb.y},{x:bb.x+bb.w,y:bb.y+bb.h},{x:bb.x,y:bb.y+bb.h}];
+    for(const c of corners) if(isPointInPolygon(c, poly)) return true;
+    return false;
+  }
+  function findIndicesInPolygon(poly){
+    const idx=[];
+    strokes.forEach((s,i)=>{ if(isStrokeInPolygon(s,poly)) idx.push(i); });
+    return idx;
+  }
+  function findImageIndicesInPolygon(poly){
+    const idx=[];
+    images.forEach((im,i)=>{ if(isImageInPolygon(im,poly)) idx.push(i); });
+    return idx;
+  }
+  function findTextIndicesInPolygon(poly){
+    const idx=[];
+    texts.forEach((t,i)=>{ if(isTextInPolygon(t,poly)) idx.push(i); });
+    return idx;
+  }
 
   // Pointer events
   let activePointerId=null;
 
   function handleSelectPointerDown(e){
     const {x,y}=getPos(e);
-    if(selection && hitSelection(x,y) && !isSelecting && (selectedIndices.length || selectedImageIndices.length)){
+    if(selection && hitSelection(x,y) && (selectedIndices.length || selectedImageIndices.length || selectedTextIndices.length)){
       isDraggingSel=true; dragStart={x,y};
       // zapamiętaj pozycję ramki i oryginalne punkty
       selPos={x:selection.x, y:selection.y};
       dragOffset={x:x-selection.x, y:y-selection.y};
       selectedOriginals = selectedIndices.map(i=> cloneStrokes([strokes[i]])[0].points.map(p=>({...p})));
       selectedImageOriginals = selectedImageIndices.map(i=> ({x:images[i].x, y:images[i].y, w:images[i].w, h:images[i].h}));
+      selectedTextOriginals = selectedTextIndices.map(i=> ({x:texts[i].x, y:texts[i].y}));
       pushHistory();
       canvas.setPointerCapture(e.pointerId); activePointerId=e.pointerId;
       canvas.classList.add('select--move'); updateSelectionUI();
       e.preventDefault(); return true;
     }
-    // klik poza zaznaczeniem – wyczyść stare
-    if(selection && !hitSelection(x,y)){
-      clearSelection(false);
+    // kliknięcie – hit test (tekst > obraz > wektor), Ctrl/Cmd = toggle
+    const hitIdxText = hitText(x,y);
+    const hitIdxImage = hitIdxText<0 ? hitImageIndex(x,y) : -1;
+    const hitIdxStroke = (hitIdxText<0 && hitIdxImage<0) ? hitStrokeIndex(x,y) : -1;
+    const isCtrl = e.ctrlKey || e.metaKey || e.shiftKey;
+    if(hitIdxText>=0 || hitIdxImage>=0 || hitIdxStroke>=0){
+      if(!isCtrl){
+        selectedIndices=[]; selectedImageIndices=[]; selectedTextIndices=[];
+        if(hitIdxText>=0) selectedTextIndices=[hitIdxText];
+        else if(hitIdxImage>=0) selectedImageIndices=[hitIdxImage];
+        else if(hitIdxStroke>=0) selectedIndices=[hitIdxStroke];
+      } else {
+        if(hitIdxText>=0){
+          const p=selectedTextIndices.indexOf(hitIdxText);
+          if(p>=0) selectedTextIndices.splice(p,1); else { selectedTextIndices.push(hitIdxText); selectedIndices=[]; selectedImageIndices=[]; }
+        } else if(hitIdxImage>=0){
+          const p=selectedImageIndices.indexOf(hitIdxImage);
+          if(p>=0) selectedImageIndices.splice(p,1); else { selectedImageIndices.push(hitIdxImage); selectedIndices=[]; selectedTextIndices=[]; }
+        } else if(hitIdxStroke>=0){
+          const p=selectedIndices.indexOf(hitIdxStroke);
+          if(p>=0) selectedIndices.splice(p,1); else { selectedIndices.push(hitIdxStroke); selectedImageIndices=[]; selectedTextIndices=[]; }
+        }
+      }
+      const bbox=computeSelectionBBox();
+      if(bbox){ selection={x:bbox.x, y:bbox.y, w:bbox.w, h:bbox.h}; }
+      else selection=null;
+      updateSelectionUI(); redraw();
+      canvas.setPointerCapture(e.pointerId); activePointerId=e.pointerId;
+      e.preventDefault(); return true;
     }
-    isSelecting=true; selStart={x,y}; selection={x,y,w:0,h:0};
+    // klik w puste – wyczyść i rozpocznij prostokąt
+    clearSelection(false);
+    isSelecting=true; selStart={x,y}; selection={x,y,w:0,h:0}; lassoPoints=null;
     canvas.setPointerCapture(e.pointerId); activePointerId=e.pointerId;
-    hint.classList.add('hide'); updateSelectionUI();
+    hint.classList.add('hide');
+    updateSelectionUI(); redraw();
     e.preventDefault(); return true;
   }
   function handleSelectPointerMove(e){
     const {x,y}=getPos(e);
     if(isSelecting && selStart){
       selection=normalizeRect(selStart.x, selStart.y, x,y);
-      updateSelectionUI(); e.preventDefault(); return true;
+      updateSelectionUI(); redraw();
+      e.preventDefault(); return true;
     }
     if(isDraggingSel && dragStart && selPos){
       const dx=x-dragStart.x, dy=y-dragStart.y;
@@ -589,6 +930,13 @@
         im.x = orig.x + dx;
         im.y = orig.y + dy;
       });
+      // przesuń teksty
+      selectedTextIndices.forEach((idx,k)=>{
+        const orig=selectedTextOriginals[k];
+        const t=texts[idx];
+        t.x = orig.x + dx;
+        t.y = orig.y + dy;
+      });
       redraw();
       updateSelectionUI();
       e.preventDefault(); return true;
@@ -602,14 +950,27 @@
       if(!selection || selection.w*scale<8 || selection.h*scale<8){
         clearSelection(false);
       } else {
-        selectedIndices=findIndicesInRect(selection);
-        selectedImageIndices=findImageIndicesInRect(selection);
-        // jeśli nic nie trafiono – zostaw pustą ramkę do ponownego zaznaczenia? wyczyść
-        if(!selectedIndices.length && !selectedImageIndices.length){
-          // zostaw ramkę ale bez podświetlenia – użytkownik widzi że nic nie ma
+        const isCtrl = e.ctrlKey || e.metaKey || e.shiftKey;
+        const foundStrokes=findIndicesInRect(selection);
+        const foundImages=findImageIndicesInRect(selection);
+        const foundTexts=findTextIndicesInRect(selection);
+        if(isCtrl){
+          for(const idx of foundStrokes) if(!selectedIndices.includes(idx)) selectedIndices.push(idx);
+          for(const idx of foundImages) if(!selectedImageIndices.includes(idx)) selectedImageIndices.push(idx);
+          for(const idx of foundTexts) if(!selectedTextIndices.includes(idx)) selectedTextIndices.push(idx);
+        } else {
+          selectedIndices=foundStrokes;
+          selectedImageIndices=foundImages;
+          selectedTextIndices=foundTexts;
+        }
+        const bbox=computeSelectionBBox();
+        if(bbox) selection={x:bbox.x, y:bbox.y, w:bbox.w, h:bbox.h}; else selection=null;
+        if(!selection || (!selectedIndices.length && !selectedImageIndices.length && !selectedTextIndices.length)){
+          // nic nie trafiono – zostaw prostokąt
         }
         updateSelectionUI(); redraw();
       }
+      lassoPoints=null; selStart=null;
       if(activePointerId!==null) try{canvas.releasePointerCapture(activePointerId);}catch(_){}
       activePointerId=null; return true;
     }
@@ -617,7 +978,7 @@
       isDraggingSel=false;
       // zatwierdź: zaktualizuj selection na nową pozycję
       if(selPos) selection={x:selPos.x, y:selPos.y, w:selection.w, h:selection.h};
-      selPos=null; selectedOriginals=[]; selectedImageOriginals=[]; dragStart=null;
+      selPos=null; selectedOriginals=[]; selectedImageOriginals=[]; selectedTextOriginals=[]; dragStart=null;
       canvas.classList.remove('select--move');
       updateSelectionUI(); redraw();
       if(activePointerId!==null) try{canvas.releasePointerCapture(activePointerId);}catch(_){}
@@ -635,11 +996,11 @@
   }
   function doPan(e){
     if(!isPanning || !panStart) return;
-    const rect=canvas.getBoundingClientRect();
+    const rect=cachedWrapRect || canvas.getBoundingClientRect();
     const cur={x:e.clientX-rect.left, y:e.clientY-rect.top};
     panX = panOrig.x + (cur.x - panStart.x);
     panY = panOrig.y + (cur.y - panStart.y);
-    redraw(); updateSelectionUI();
+    requestRedrawThrottled(); updateSelectionUI();
   }
   function endPan(e){
     if(!isPanning) return;
@@ -651,152 +1012,111 @@
   }
 
   canvas.addEventListener('pointerdown', (e)=>{
-    // pan – narzędzie pointer / środkowy przycisk / Alt / Spacja (blokuj gdy już rysujemy wielodotykiem)
+    // pan – narzędzie pointer / środkowy przycisk / Alt / Spacja
     if(tool==='pointer' || e.button===1 || (e.button===0 && e.altKey) || isSpacePressed){
-      if(activeStrokes.size>0 || eraserLastMap.size>0) return;
       startPan(e); e.preventDefault(); return;
     }
     if(tool==='select'){ handleSelectPointerDown(e); return; }
+    if(tool==='text'){
+      const {x,y}=getPos(e);
+      const idx=hitText(x,y);
+      if(idx>=0){
+        const t=texts[idx];
+        createTextEditor(t.x, t.y, idx);
+      } else {
+        if(editingText) commitTextEdit(true);
+        createTextEditor(x,y, null);
+      }
+      e.preventDefault();
+      canvas.setPointerCapture(e.pointerId); activePointerId=e.pointerId;
+      return;
+    }
     if(e.button!==0 && e.button!==5) return;
-    if(e.pointerType==='touch' && pinchStartDist) return;
     let effectiveTool=tool;
     if(e.pointerType==='pen' && e.button===5) effectiveTool='eraser';
     if(e.pointerType==='pen' && e.buttons===32) effectiveTool='eraser';
     e.preventDefault();
-    canvas.setPointerCapture(e.pointerId);
+    canvas.setPointerCapture(e.pointerId); activePointerId=e.pointerId;
     const {x,y,pressure}=getPos(e);
+    isDrawing=true; lastX=x; lastY=y;
     hint.classList.add('hide');
-    if(!canvas._activeTools) canvas._activeTools=new Map();
 
     if(effectiveTool==='eraser'){
-      const isFirst = activeStrokes.size===0 && eraserLastMap.size===0;
-      if(isFirst) pushHistory();
-      eraserLastMap.set(e.pointerId, {x,y});
-      canvas._activeTools.set(e.pointerId, 'eraser');
-      isDrawing=true; eraserLast={x,y}; lastX=x; lastY=y;
-      try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
-      activePointerId=e.pointerId;
+      pushHistory();
+      eraserLast={x,y};
       const screenR= baseWidth*3.2+6, worldR=screenR/scale;
       const before=strokes.length;
       strokes = strokes.filter(s=> !isStrokeHitByEraser(s, x,y,x,y, worldR/2));
       if(strokes.length!==before) redraw();
+      canvas.dataset.effectiveTool='eraser';
       return;
     }
-    // pen – nowy wektor per pointerId (wielodotyk)
-    const isFirstPen = activeStrokes.size===0 && eraserLastMap.size===0;
-    if(isFirstPen) pushHistory();
-    const newStroke={id: Date.now()+Math.random(), color, baseWidth, usePressure, points:[{x,y,pressure}], pointerId:e.pointerId};
-    strokes.push(newStroke);
-    activeStrokes.set(e.pointerId, newStroke);
-    currentStroke=newStroke; isDrawing=true; lastX=x; lastY=y;
-    canvas._activeTools.set(e.pointerId, 'pen');
-    try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
-    activePointerId=e.pointerId;
+    // pen – nowy wektor
+    pushHistory();
+    currentStroke={id: Date.now()+Math.random(), color, baseWidth, usePressure, points:[{x,y,pressure}]};
+    strokes.push(currentStroke);
+    // narysuj kropkę (z uwzględnieniem skali)
     const w=widthForPressure(pressure, baseWidth);
     ctx.save(); ctx.setTransform(scale*dpr(),0,0,scale*dpr(), panX*dpr(), panY*dpr());
     ctx.fillStyle=color;
     ctx.beginPath(); ctx.arc(x,y,w/2,0,Math.PI*2); ctx.fill();
     ctx.restore();
+    // pełny redraw zapewni spójność wygładzania
+    canvas.dataset.effectiveTool='pen';
   });
 
   canvas.addEventListener('pointermove', (e)=>{
-    const {x,y,pressure}=getPos(e);
-    lastMouseWorld={x,y};
-    cursor.style.left=e.clientX+'px'; cursor.style.top=e.clientY+'px';
-    if(isPanning){ doPan(e); return; }
-    if(tool==='select'){ handleSelectPointerMove(e); return; }
-    // wielodotyk – obsługa per pointerId
-    const effMap = canvas._activeTools ? canvas._activeTools.get(e.pointerId) : null;
-    const eff = effMap || canvas.dataset.effectiveTool || tool;
-    if(eff==='eraser' && eraserLastMap.has(e.pointerId)){
-      e.preventDefault();
-      const screenR= baseWidth*3.2+6, worldR=screenR/scale;
-      const last = eraserLastMap.get(e.pointerId);
-      const x0=last?last.x:x, y0=last?last.y:y;
-      const before=strokes.length;
-      strokes = strokes.filter(s=> !isStrokeHitByEraser(s, x0,y0,x,y, worldR/2));
-      eraserLastMap.set(e.pointerId, {x,y});
-      eraserLast={x,y}; lastX=x; lastY=y;
-      if(strokes.length!==before) redraw();
-      return;
-    }
-    if(activeStrokes.has(e.pointerId)){
-      e.preventDefault();
-      const st = activeStrokes.get(e.pointerId);
-      const last = st.points[st.points.length-1];
-      if(last && Math.hypot(last.x - x, last.y - y) < 0.6) return;
-      st.points.push({x,y,pressure});
-      currentStroke=st; lastX=x; lastY=y;
-      redraw();
-      return;
-    }
-    // fallback single-pointer (kompatybilność)
-    if(!isDrawing || (activePointerId!==null && e.pointerId!==activePointerId)) return;
+    const evts = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    const lastE = evts[evts.length-1];
+    const {x:lx, y:ly, pressure:lp} = getPos(lastE);
+    lastMouseWorld={x:lx, y:ly};
+    cursor.style.left=lastE.clientX+'px'; cursor.style.top=lastE.clientY+'px';
+    if(isPanning){ doPan(lastE); return; }
+    if(tool==='select'){ handleSelectPointerMove(lastE); return; }
+    if(!isDrawing || e.pointerId!==activePointerId) return;
     e.preventDefault();
+    const eff=canvas.dataset.effectiveTool||tool;
     if(eff==='eraser'){
-      const screenR= baseWidth*3.2+6, worldR=screenR/scale;
-      const x0=eraserLast?eraserLast.x:x, y0=eraserLast?eraserLast.y:y;
-      const before=strokes.length;
-      strokes = strokes.filter(s=> !isStrokeHitByEraser(s, x0,y0,x,y, worldR/2));
-      eraserLast={x,y};
-      if(strokes.length!==before) redraw();
-      lastX=x; lastY=y;
+      let changed=false;
+      for(const ce of evts){
+        const {x,y}=getPos(ce);
+        const screenR= baseWidth*3.2+6, worldR=screenR/scale;
+        const x0=eraserLast?eraserLast.x:x, y0=eraserLast?eraserLast.y:y;
+        const before=strokes.length;
+        strokes = strokes.filter(s=> !isStrokeHitByEraser(s, x0,y0,x,y, worldR/2));
+        if(strokes.length!==before) changed=true;
+        eraserLast={x,y}; lastX=x; lastY=y;
+      }
+      if(changed) redraw();
       return;
     }
     if(currentStroke){
-      const last = currentStroke.points[currentStroke.points.length-1];
-      if(last && Math.hypot(last.x - x, last.y - y) < 0.6) return;
-      currentStroke.points.push({x,y,pressure});
-      redraw();
-      lastX=x; lastY=y;
+      let added=false;
+      for(const ce of evts){
+        const {x,y,pressure}=getPos(ce);
+        const last = currentStroke.points[currentStroke.points.length-1];
+        if(last && Math.hypot(last.x - x, last.y - y) < (isFirefox ? 0 : 0.01)) continue;
+        currentStroke.points.push({x,y,pressure});
+        lastX=x; lastY=y; added=true;
+      }
+      if(added){
+        if(currentStroke.points.length <= 4) redraw();
+        else requestRedrawThrottled();
+      }
     }
   });
 
   function endDraw(e){
-    if(isPanning){
-      if(e && activePointerId!==null && e.pointerId!==activePointerId) return;
-      endPan(e); return;
-    }
+    if(isPanning){ endPan(e); return; }
     if(tool==='select'){ if(e) handleSelectPointerUp(e); return; }
-    if(e && e.pointerId!=null){
-      let had=false;
-      if(activeStrokes.has(e.pointerId)){
-        activeStrokes.delete(e.pointerId);
-        had=true;
-      }
-      if(eraserLastMap.has(e.pointerId)){
-        eraserLastMap.delete(e.pointerId);
-        had=true;
-      }
-      if(canvas._activeTools) canvas._activeTools.delete(e.pointerId);
-      try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
-      if(had){
-        const remaining=[...activeStrokes.values()];
-        currentStroke = remaining.length ? remaining[remaining.length-1] : null;
-        if(activeStrokes.size>0 || eraserLastMap.size>0){
-          isDrawing=true;
-          activePointerId = remaining.length ? [...activeStrokes.keys()].pop() : ([...eraserLastMap.keys()].pop() || null);
-          redraw();
-          return;
-        }
-        isDrawing=false; activePointerId=null; currentStroke=null; eraserLast=null;
-        ctx.globalCompositeOperation='source-over';
-        redraw();
-        return;
-      }
-      // fallback single-pointer
-      if(!isDrawing) return;
-      if(activePointerId!==null && e.pointerId!==activePointerId) return;
-      isDrawing=false; activePointerId=null; currentStroke=null; eraserLast=null;
-      ctx.globalCompositeOperation='source-over';
-      redraw();
-      return;
-    }
-    activeStrokes.clear(); eraserLastMap.clear();
-    if(canvas._activeTools) canvas._activeTools.clear();
-    isDrawing=false; activePointerId=null; currentStroke=null; eraserLast=null;
+    if(!isDrawing) return;
+    if(e && activePointerId!==null && e.pointerId!==activePointerId) return;
+    isDrawing=false; activePointerId=null;
+    currentStroke=null; eraserLast=null;
     ctx.globalCompositeOperation='source-over';
     redraw();
+    updateCursor();
+    if(e) { cursor.style.left=e.clientX+'px'; cursor.style.top=e.clientY+'px'; }
   }
   canvas.addEventListener('pointerup', endDraw);
   canvas.addEventListener('pointercancel', (e)=>{
@@ -812,29 +1132,6 @@
         redraw();
         clearSelection(false); activePointerId=null; return;
       }
-    }
-    // przy cancel usuń niekompletne strokes wielodotyku
-    if(e && e.pointerId!=null && activeStrokes.has(e.pointerId)){
-      const st=activeStrokes.get(e.pointerId);
-      const idx=strokes.indexOf(st);
-      if(idx!==-1) strokes.splice(idx,1);
-      activeStrokes.delete(e.pointerId);
-      if(canvas._activeTools) canvas._activeTools.delete(e.pointerId);
-      try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
-      if(activeStrokes.size>0 || eraserLastMap.size>0){
-        isDrawing=true;
-        currentStroke=[...activeStrokes.values()].pop()||null;
-        redraw(); return;
-      }
-      isDrawing=false; activePointerId=null; currentStroke=null; eraserLast=null;
-      redraw(); return;
-    }
-    if(e && e.pointerId!=null && eraserLastMap.has(e.pointerId)){
-      eraserLastMap.delete(e.pointerId);
-      if(canvas._activeTools) canvas._activeTools.delete(e.pointerId);
-      try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
-      if(activeStrokes.size>0 || eraserLastMap.size>0){ isDrawing=true; redraw(); return; }
-      isDrawing=false; redraw(); return;
     }
     endDraw(e);
   });
@@ -853,6 +1150,36 @@
   sizeRange.addEventListener('input', e=>{ baseWidth=parseInt(e.target.value,10); sizeLabel.textContent=baseWidth+' px'; updateCursor(); });
   pressureToggle.addEventListener('change', e=> usePressure=e.target.checked);
   bgSelect.addEventListener('change', e=>{ bg=e.target.value; applyBackground(); });
+  btnTheme?.addEventListener('click', ()=> applyTheme(!isDarkMode()));
+  btnToolbarPos?.addEventListener('click', ()=> applyToolbarPos(!isToolbarRight()));
+  const btnMore=document.getElementById('btn-more');
+  const moreMenu=document.getElementById('more-menu');
+  btnMore?.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const isHidden = moreMenu.hasAttribute('hidden');
+    if(isHidden){
+      const r=btnMore.getBoundingClientRect();
+      const menuW=200;
+      if(isToolbarRight()){
+        moreMenu.style.left=(r.left - menuW - 12)+'px';
+        moreMenu.style.top=r.top+'px';
+        moreMenu.style.right='auto';
+      } else {
+        moreMenu.style.left=Math.min(window.innerWidth - menuW - 12, r.right - menuW)+'px';
+        moreMenu.style.top=(r.bottom + 8)+'px';
+        moreMenu.style.right='auto';
+      }
+      moreMenu.removeAttribute('hidden');
+    } else {
+      moreMenu.setAttribute('hidden','');
+    }
+  });
+  document.addEventListener('click', (e)=>{
+    if(moreMenu && !moreMenu.hasAttribute('hidden') && !moreMenu.contains(e.target) && e.target!==btnMore && !btnMore.contains(e.target)){
+      moreMenu.setAttribute('hidden','');
+    }
+  });
+  moreMenu?.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=> moreMenu.setAttribute('hidden','')));
   // zoom UI
   document.getElementById('zoom-in')?.addEventListener('click', ()=> zoomIn());
   document.getElementById('zoom-out')?.addEventListener('click', ()=> zoomOut());
@@ -898,6 +1225,15 @@
   // dwuklik – reset
   canvas.addEventListener('dblclick', (e)=>{
     if(tool==='pointer' || e.altKey) { resetView(); e.preventDefault(); }
+  });
+  canvas.addEventListener('dblclick', (e)=>{
+    const {x,y}=getPos(e);
+    const idx=hitText(x,y);
+    if(idx>=0){
+      createTextEditor(texts[idx].x, texts[idx].y, idx);
+      setTool('text');
+      e.preventDefault();
+    }
   });
   btnUndo.addEventListener('click', undo);
   btnRedo.addEventListener('click', redo);
@@ -1021,12 +1357,15 @@
   }
   // --- SVG export / import ---
   function getStrokesBBox(){
-    if(!strokes.length) return null;
     let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    let has=false;
     strokes.forEach(s=> s.points.forEach(p=>{
-      if(p.x<minX)minX=p.x; if(p.y<minY)minY=p.y; if(p.x>maxX)maxX=p.x; if(p.y>maxY)maxY=p.y;
+      has=true; if(p.x<minX)minX=p.x; if(p.y<minY)minY=p.y; if(p.x>maxX)maxX=p.x; if(p.y>maxY)maxY=p.y;
     }));
-    const pad = Math.max(...strokes.map(s=>s.baseWidth), 12) + 16;
+    images.forEach(im=>{ has=true; if(im.x<minX)minX=im.x; if(im.y<minY)minY=im.y; if(im.x+im.w>maxX)maxX=im.x+im.w; if(im.y+im.h>maxY)maxY=im.y+im.h; });
+    texts.forEach(t=>{ const bb=getTextBBox(t); if(bb){ has=true; if(bb.minX<minX)minX=bb.minX; if(bb.minY<minY)minY=bb.minY; if(bb.maxX>maxX)maxX=bb.maxX; if(bb.maxY>maxY)maxY=bb.maxY; }});
+    if(!has) return null;
+    const pad = Math.max(12, ...strokes.map(s=>s.baseWidth), ...texts.map(t=>t.size||16)) + 16;
     return {minX: minX-pad, minY: minY-pad, maxX: maxX+pad, maxY: maxY+pad, w: (maxX-minX)+pad*2, h: (maxY-minY)+pad*2};
   }
   function exportSVG(){
@@ -1056,7 +1395,7 @@
     }
     // metadata – pełny zapis wektorów do idealnego importu
     try{
-      const json = JSON.stringify({strokes, bg, version:2});
+      const json = JSON.stringify({strokes, images: images.map(im=>({src:im.src,x:im.x,y:im.y,w:im.w,h:im.h})), texts, bg, version:3});
       const b64 = btoa(unescape(encodeURIComponent(json)));
       svg += `<metadata id="whiteboard-data">${b64}</metadata>\n`;
     }catch(e){}
@@ -1076,7 +1415,26 @@
         }
       }
     });
-    svg += `</g>\n</svg>`;
+    svg += `</g>\n`;
+    if(images.length){
+      svg += `<g id="images">\n`;
+      images.forEach(im=>{
+        svg += `  <image href="${esc(im.src)}" x="${im.x.toFixed(2)}" y="${im.y.toFixed(2)}" width="${im.w.toFixed(2)}" height="${im.h.toFixed(2)}" preserveAspectRatio="none"/>\n`;
+      });
+      svg += `</g>\n`;
+    }
+    if(texts.length){
+      svg += `<g id="texts" font-family="Inter, sans-serif">\n`;
+      texts.forEach(t=>{
+        const lines=t.text.split('\n');
+        lines.forEach((line,i)=>{
+          const y=t.y + i*t.size*1.25;
+          svg += `  <text x="${t.x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${t.size}" fill="${esc(t.color)}" dominant-baseline="hanging">${esc(line).replace(/>/g,'&gt;')}</text>\n`;
+        });
+      });
+      svg += `</g>\n`;
+    }
+    svg += `</svg>`;
     const blob = new Blob([svg], {type:'image/svg+xml;charset=utf-8'});
     const url = URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download='whiteboard-'+new Date().toISOString().slice(0,10)+'.svg'; a.click();
@@ -1090,9 +1448,13 @@
       try{
         const json = decodeURIComponent(escape(atob(meta.textContent.trim())));
         const data=JSON.parse(json);
-        if(data.strokes && Array.isArray(data.strokes)){
+        if(Array.isArray(data.strokes) || Array.isArray(data.texts) || Array.isArray(data.images)){
           pushHistory();
-          strokes = data.strokes;
+          if(Array.isArray(data.strokes)) strokes = data.strokes; else strokes=[];
+          if(Array.isArray(data.texts)) texts = data.texts; else texts=[];
+          if(Array.isArray(data.images)){
+            images = data.images.map(d=>{ const im={id:d.id||Date.now()+Math.random(), src:d.src, x:d.x, y:d.y, w:d.w, h:d.h, _img:null}; const img=new Image(); img.src=d.src; img.onload=()=>redraw(); im._img=img; return im; });
+          } else images=[];
           if(data.bg) { bg=data.bg; const sel=document.getElementById('bg-select'); if(sel) sel.value=bg; applyBackground(); }
           // dopasuj widok do zaimportowanych wektorów
           const bb=getStrokesBBox();
@@ -1190,6 +1552,15 @@
   }
 
   document.addEventListener('keydown', e=>{
+    if(editingText){
+      if(e.key==='Escape'){ e.preventDefault(); cancelTextEdit(false); }
+      return;
+    }
+    const aeActive=document.activeElement;
+    if(aeActive && (aeActive.tagName==='TEXTAREA' || aeActive.tagName==='INPUT' || aeActive.isContentEditable)){
+      if(e.key==='Escape'){ e.preventDefault(); if(editingText) cancelTextEdit(false); }
+      return;
+    }
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); if(e.shiftKey) redo(); else undo(); }
     else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); }
     else if((e.ctrlKey||e.metaKey) && (e.key==='0' || e.key===' ')){ e.preventDefault(); resetView(); }
@@ -1202,6 +1573,11 @@
     else if(e.key==='p'||e.key==='P'){ setTool('pen'); }
     else if(e.key==='v'||e.key==='V'){ setTool('select'); }
     else if(e.key==='h'||e.key==='H'){ setTool('pointer'); }
+    else if(e.key==='t'||e.key==='T'){ setTool('text'); }
+    else if(e.key==='d'||e.key==='D'){ if(!e.ctrlKey && !e.metaKey && !e.altKey){ e.preventDefault(); applyTheme(!isDarkMode()); } }
+    else if(e.key==='r'||e.key==='R'){ if(!e.ctrlKey && !e.metaKey && !e.altKey){ e.preventDefault(); applyToolbarPos(!isToolbarRight()); } }
+    else if(e.key==='[' || e.key==='{' ){ if(!e.ctrlKey && !e.metaKey){ e.preventDefault(); baseWidth=Math.max(1, baseWidth-1); sizeRange.value=baseWidth; sizeLabel.textContent=baseWidth+' px'; updateCursor(); } }
+    else if(e.key===']' || e.key==='}' ){ if(!e.ctrlKey && !e.metaKey){ e.preventDefault(); baseWidth=Math.min(48, baseWidth+1); sizeRange.value=baseWidth; sizeLabel.textContent=baseWidth+' px'; updateCursor(); } }
     else if(e.code==='Space' || e.key===' '){
       const ae=document.activeElement;
       if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.isContentEditable)) return;
@@ -1213,6 +1589,7 @@
       e.preventDefault();
     }
     else if(e.key==='Escape'){
+      if(editingText){ e.preventDefault(); cancelTextEdit(false); return; }
       if(tool==='select' && (selection||isDraggingSel)){
         e.preventDefault();
         // cofnij drag jeśli był
@@ -1223,17 +1600,22 @@
           if(selectedImageIndices.length && selectedImageOriginals.length){
             selectedImageIndices.forEach((idx,k)=>{ const o=selectedImageOriginals[k]; images[idx].x=o.x; images[idx].y=o.y; });
           }
+          if(selectedTextIndices.length && selectedTextOriginals.length){
+            selectedTextIndices.forEach((idx,k)=>{ const o=selectedTextOriginals[k]; texts[idx].x=o.x; texts[idx].y=o.y; });
+          }
           redraw();
         }
         clearSelection(false);
-      }
+      } else if(tool==='text' && editingText){ e.preventDefault(); cancelTextEdit(false); }
     }
     else if(e.key==='Delete'||e.key==='Backspace'){
-      if(tool==='select' && selection && (selectedIndices.length || selectedImageIndices.length)){
+      if(editingText) return;
+      if(tool==='select' && selection && (selectedIndices.length || selectedImageIndices.length || selectedTextIndices.length)){
         e.preventDefault(); pushHistory();
         // usuń zaznaczone wektory – od końca by indeksy się nie rozjechały
         selectedIndices.sort((a,b)=>b-a).forEach(i=> strokes.splice(i,1));
         selectedImageIndices.sort((a,b)=>b-a).forEach(i=> images.splice(i,1));
+        selectedTextIndices.sort((a,b)=>b-a).forEach(i=> texts.splice(i,1));
         clearSelection(false); redraw();
       } else if(e.key==='Delete') { if(confirm('Wyczyścić tablicę?')) clearCanvas(true); }
     }
@@ -1254,7 +1636,13 @@
   document.addEventListener('touchmove', e=>{ if(e.target.closest('canvas')) e.preventDefault(); }, {passive:false});
 
   function init(){
+    const saved=localStorage.getItem('whiteb-theme');
+    if(saved==='dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) applyTheme(true);
+    else applyTheme(false);
+    const savedPos=localStorage.getItem('whiteb-toolbar-pos');
+    applyToolbarPos(savedPos==='right');
     resizeCanvas(false);
+    updateCachedRect();
     setTool(tool);
     updateUndoRedo();
     updateZoomLabel();
